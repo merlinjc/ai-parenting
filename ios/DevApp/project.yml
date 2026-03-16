@@ -1,0 +1,31 @@
+name: DevApp
+options:
+  bundleIdPrefix: com.aiparenting
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: false
+
+packages:
+  AIParenting:
+    path: ".."
+
+targets:
+  DevApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: .
+        excludes:
+          - "project.yml"
+          - "*.xcodeproj/**"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aiparenting.dev
+        INFOPLIST_FILE: Info.plist
+        CODE_SIGN_ENTITLEMENTS: DevApp.entitlements
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: false
+    dependencies:
+      - package: AIParenting

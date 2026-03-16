@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SQLite development database
+*.db
+
+# Environment files
+.env
+.env.local
+
+# Xcode generated project (regenerate with: cd ios/DevApp && xcodegen generate)
+ios/DevApp/DevApp.xcodeproj/
+ios/DevApp/build/
+
+# Swift Package Manager
+ios/.build/
+ios/.swiftpm/
