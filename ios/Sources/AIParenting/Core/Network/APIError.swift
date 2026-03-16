@@ -20,11 +20,14 @@ public enum APIError: Error, LocalizedError, Sendable {
     /// 资源不存在（404）
     case notFound
 
+    /// 资源冲突（409）— 例如邮箱已注册
+    case conflict
+
     /// 请求验证失败（422）
     case validationError(detail: String?)
 
     /// 服务端错误（500+）
-    case serverError
+    case serverError(String? = nil)
 
     /// 请求超时
     case timeout
@@ -44,10 +47,12 @@ public enum APIError: Error, LocalizedError, Sendable {
             return "登录已过期，请重新登录"
         case .notFound:
             return "请求的资源不存在"
+        case .conflict:
+            return "资源冲突，请检查后重试"
         case .validationError(let detail):
             return detail ?? "请求参数有误"
-        case .serverError:
-            return "服务器繁忙，请稍后重试"
+        case .serverError(let msg):
+            return msg ?? "服务器繁忙，请稍后重试"
         case .timeout:
             return "请求超时，请稍后重试"
         case .unknown:
@@ -62,10 +67,12 @@ public enum APIError: Error, LocalizedError, Sendable {
             return .unauthorized
         case 404:
             return .notFound
+        case 409:
+            return .conflict
         case 422:
             return .validationError(detail: message)
         case 500...599:
-            return .serverError
+            return .serverError(message)
         default:
             return .httpError(statusCode: statusCode, message: message)
         }

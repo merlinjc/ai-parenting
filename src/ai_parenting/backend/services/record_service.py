@@ -1,10 +1,12 @@
 """观察记录服务。
 
 实现记录的创建、查询、按周聚合等操作。
+创建记录时自动联动更新关联计划的 DayTask 完成状态。
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -14,9 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai_parenting.backend.models import Record
 from ai_parenting.backend.schemas import RecordCreate
 
+logger = logging.getLogger(__name__)
+
 
 async def create_record(db: AsyncSession, data: RecordCreate) -> Record:
-    """创建观察记录。"""
+    """创建观察记录，并联动更新关联计划的 DayTask 完成状态。"""
     record = Record(
         child_id=data.child_id,
         type=data.type,
@@ -34,6 +38,40 @@ async def create_record(db: AsyncSession, data: RecordCreate) -> Record:
     db.add(record)
     await db.flush()
     await db.refresh(record)
+
+    # Gap 8: 记录关联了计划时，自动回写 DayTask 完成状态
+    if data.source_plan_id is not None:
+        try:
+            from ai_parenting.backend.services.plan_service import (
+                get_plan,
+                update_day_task_completion,
+            )
+            from ai_parenting.models.enums import CompletionStatus
+
+            plan = await get_plan(db, data.source_plan_id)
+            if plan is not None and plan.status == "active":
+                day_task, updated_plan = await update_day_task_completion(
+                    db,
+                    plan_id=plan.id,
+                    day_number=plan.current_day,
+                    completion_status=CompletionStatus.EXECUTED.value,
+                )
+                if day_task is not None:
+                    record.synced_to_plan = True
+                    await db.flush()
+                    await db.refresh(record)
+                    logger.info(
+                        "Record %s synced to DayTask day=%d of plan %s",
+                        record.id,
+                        plan.current_day,
+                        plan.id,
+                    )
+        except Exception:
+            logger.exception(
+                "Failed to sync record %s to plan DayTask", record.id
+            )
+            # 不因联动失败阻断记录创建
+
     return record
 
 

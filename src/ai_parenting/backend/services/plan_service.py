@@ -1,10 +1,11 @@
 """微计划与日任务服务。
 
-实现计划创建（含 AI 生成）、日任务管理和完成状态回写。
+实现计划创建（含 AI 生成）、日任务管理、完成状态回写和日推进。
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -17,6 +18,8 @@ from ai_parenting.models.enums import (
     SessionStatus,
     SessionType,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def get_active_plan(db: AsyncSession, child_id: uuid.UUID) -> Plan | None:
@@ -164,3 +167,108 @@ async def get_today_task(
         if task.day_number == plan.current_day:
             return task
     return None
+
+
+async def list_plans(
+    db: AsyncSession,
+    child_id: uuid.UUID,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[Plan], int]:
+    """获取儿童的所有计划列表（按创建时间降序）。
+
+    Returns:
+        (plans, total_count)
+    """
+    from sqlalchemy import func
+
+    # 总数
+    count_result = await db.execute(
+        select(func.count()).select_from(Plan).where(Plan.child_id == child_id)
+    )
+    total = count_result.scalar() or 0
+
+    # 分页查询
+    result = await db.execute(
+        select(Plan)
+        .where(Plan.child_id == child_id)
+        .order_by(Plan.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    plans = list(result.scalars().all())
+    return plans, total
+
+
+async def append_focus_note(
+    db: AsyncSession, plan_id: uuid.UUID, note: str
+) -> Plan | None:
+    """将关注内容追加到计划的 next_week_context 字段。
+
+    采用追加式写入，不覆盖已有内容。多条关注项以换行分隔。
+
+    Returns:
+        更新后的 Plan，如果未找到则返回 None。
+    """
+    plan = await get_plan(db, plan_id)
+    if plan is None:
+        return None
+
+    existing = plan.next_week_context or ""
+    separator = "\n" if existing else ""
+    plan.next_week_context = existing + separator + note
+
+    plan.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    await db.refresh(plan)
+    return plan
+
+
+async def advance_all_plans(db: AsyncSession) -> dict:
+    """推进所有活跃计划的 current_day。
+
+    每日零点调用，执行以下逻辑：
+    - current_day < 7 → current_day + 1
+    - current_day >= 7 → status 设为 "completed"
+
+    Returns:
+        统计信息字典 {"advanced": N, "completed": N}
+    """
+    result = await db.execute(
+        select(Plan).where(Plan.status == "active")
+    )
+    active_plans = list(result.scalars().all())
+
+    advanced_count = 0
+    completed_count = 0
+    plans_reaching_day7: list[Plan] = []
+
+    for plan in active_plans:
+        if plan.current_day >= 7:
+            # 计划已到期，标记完成
+            plan.status = "completed"
+            plan.updated_at = datetime.now(timezone.utc)
+            completed_count += 1
+        else:
+            plan.current_day += 1
+            plan.updated_at = datetime.now(timezone.utc)
+            advanced_count += 1
+
+            # 记录推进到第 7 天的计划（用于触发周反馈）
+            if plan.current_day == 7:
+                plans_reaching_day7.append(plan)
+
+    await db.flush()
+
+    logger.info(
+        "Plan day advancement: advanced=%d, completed=%d, reaching_day7=%d",
+        advanced_count,
+        completed_count,
+        len(plans_reaching_day7),
+    )
+
+    return {
+        "advanced": advanced_count,
+        "completed": completed_count,
+        "plans_reaching_day7": plans_reaching_day7,
+    }

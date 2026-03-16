@@ -14,6 +14,7 @@ public struct RecordListView: View {
         (nil, "全部"),
         ("quick_check", "快检"),
         ("event", "事件"),
+        ("voice", "语音"),
     ]
 
     public init(childId: UUID) {
@@ -150,10 +151,10 @@ public struct RecordListView: View {
     private func recordCard(_ record: RecordResponse) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: record.type == "quick_check" ? "checkmark.circle.fill" : "doc.text.fill")
-                    .foregroundStyle(record.type == "quick_check" ? .green : .blue)
+                Image(systemName: recordIcon(record.type))
+                    .foregroundStyle(recordIconColor(record.type))
 
-                Text(record.type == "quick_check" ? "快速检查" : "事件记录")
+                Text(RecordType(rawValue: record.type)?.displayName ?? record.type)
                     .font(.subheadline)
                     .fontWeight(.medium)
 
@@ -162,6 +163,26 @@ public struct RecordListView: View {
                 Text(record.createdAt, style: .relative)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            // 来源关联标注
+            if record.sourcePlanId != nil || record.sourceSessionId != nil {
+                HStack(spacing: 6) {
+                    Image(systemName: "link")
+                        .font(.caption2)
+                    if record.sourceSessionId != nil {
+                        Text("来自即时求助")
+                            .font(.caption2)
+                    } else {
+                        Text("来自计划任务")
+                            .font(.caption2)
+                    }
+                    if record.syncedToPlan {
+                        Text("· 已同步到计划页，影响本周判断")
+                            .font(.caption2)
+                    }
+                }
+                .foregroundStyle(.blue.opacity(0.7))
             }
 
             // 标签
@@ -206,5 +227,21 @@ public struct RecordListView: View {
                 .fill(.background)
                 .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
         )
+    }
+
+    private func recordIcon(_ type: String) -> String {
+        switch type {
+        case "quick_check": return "checkmark.circle.fill"
+        case "voice": return "mic.circle.fill"
+        default: return "doc.text.fill"
+        }
+    }
+
+    private func recordIconColor(_ type: String) -> Color {
+        switch type {
+        case "quick_check": return .green
+        case "voice": return .purple
+        default: return .blue
+        }
     }
 }

@@ -5,7 +5,7 @@ import Observation
 
 /// 周反馈 ViewModel
 ///
-/// 触发生成（202）→ 轮询等待（2s 间隔）→ 展示结果 → 提交决策。
+/// 触发生成（202）→ 轮询等待（2s 间隔）→ 展示结果 → 提交决策 → 创建下周计划。
 /// 使用 Task cancellation 管理轮询生命周期。
 @Observable
 public final class FeedbackViewModel {
@@ -16,7 +16,9 @@ public final class FeedbackViewModel {
     public var isLoading = false
     public var isGenerating = false
     public var isSubmitting = false
+    public var isCreatingPlan = false
     public var error: APIError?
+    public var newPlanId: UUID?
 
     // MARK: - Computed
 
@@ -32,6 +34,31 @@ public final class FeedbackViewModel {
         case "failed": return "生成失败"
         default: return "周反馈"
         }
+    }
+
+    /// 解析后的正向变化列表
+    public var parsedPositiveChanges: [FeedbackChangeItem] {
+        feedback?.parsedPositiveChanges ?? []
+    }
+
+    /// 解析后的改进方向列表
+    public var parsedOpportunities: [FeedbackChangeItem] {
+        feedback?.parsedOpportunities ?? []
+    }
+
+    /// 解析后的 AI 生成决策选项
+    public var parsedDecisionOptions: [DecisionOptionItem] {
+        feedback?.parsedDecisionOptions ?? []
+    }
+
+    /// 保守路径说明
+    public var conservativePathNote: String? {
+        feedback?.conservativePathNote
+    }
+
+    /// 是否有结构化反馈内容（用于判断是否展示结构化 UI）
+    public var hasStructuredContent: Bool {
+        !parsedPositiveChanges.isEmpty || !parsedOpportunities.isEmpty
     }
 
     // MARK: - Dependencies
@@ -113,6 +140,23 @@ public final class FeedbackViewModel {
             self.error = .networkError(underlying: error)
         }
         isSubmitting = false
+    }
+
+    /// 决策后创建下周计划
+    @MainActor
+    public func createNewPlanAfterDecision() async -> UUID? {
+        guard let childId = feedback?.childId else { return nil }
+        isCreatingPlan = true
+        defer { isCreatingPlan = false }
+
+        do {
+            let plan: PlanResponse = try await apiClient.request(.createPlan(childId: childId))
+            newPlanId = plan.id
+            return plan.id
+        } catch {
+            // 计划创建失败不阻断 UI，用户可稍后手动触发
+            return nil
+        }
     }
 
     public func stopPolling() {

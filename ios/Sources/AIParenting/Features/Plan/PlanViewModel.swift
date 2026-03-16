@@ -5,7 +5,8 @@ import Observation
 
 /// 计划 ViewModel
 ///
-/// 获取活跃计划、计划详情、更新日任务完成状态、创建新计划。
+/// 获取活跃计划、计划详情、更新日任务完成状态、创建新计划、
+/// 缓存解析后的 observationCandidates、暴露 weeklyFeedbackStatus。
 @Observable
 public final class PlanViewModel {
 
@@ -18,6 +19,10 @@ public final class PlanViewModel {
     public var error: APIError?
     public var updateError: APIError?
 
+    /// 历次计划列表
+    public var planHistory: [PlanResponse] = []
+    public var isLoadingHistory = false
+
     // MARK: - Computed
 
     public var dayTasks: [DayTaskResponse] { plan?.dayTasks ?? [] }
@@ -28,10 +33,32 @@ public final class PlanViewModel {
         return plan.dayTasks.first { $0.dayNumber == plan.currentDay }
     }
 
+    /// 缓存解析后的快速打点候选项
+    public var cachedObservationCandidates: [ObservationCandidateItem] {
+        plan?.parsedObservationCandidates ?? []
+    }
+
+    /// 是否有周反馈就绪（ready/viewed/decided 均显示入口）
+    public var hasWeeklyFeedback: Bool {
+        guard let status = weeklyFeedbackStatus else { return false }
+        return ["ready", "viewed", "decided", "generating"].contains(status)
+    }
+
+    /// 周反馈入口按钮文字
+    public var weeklyFeedbackButtonText: String {
+        switch weeklyFeedbackStatus {
+        case "ready": return "查看本周反馈（新）"
+        case "viewed": return "查看本周反馈"
+        case "decided": return "查看反馈与决策"
+        case "generating": return "反馈生成中..."
+        default: return "查看本周反馈"
+        }
+    }
+
     // MARK: - Dependencies
 
     private let apiClient: APIClientProtocol
-    private let childId: UUID
+    public let childId: UUID
 
     public init(apiClient: APIClientProtocol, childId: UUID) {
         self.apiClient = apiClient
@@ -115,5 +142,18 @@ public final class PlanViewModel {
             self.error = .networkError(underlying: error)
         }
         isCreating = false
+    }
+
+    /// 加载历次计划列表
+    @MainActor
+    public func loadPlanHistory() async {
+        isLoadingHistory = true
+        do {
+            let result: PlanListResponse = try await apiClient.request(.listPlans(childId: childId))
+            planHistory = result.plans
+        } catch {
+            // 历次计划加载失败不阻断主流程
+        }
+        isLoadingHistory = false
     }
 }

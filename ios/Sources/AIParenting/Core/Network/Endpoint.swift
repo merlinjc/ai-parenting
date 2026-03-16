@@ -10,6 +10,11 @@ public enum Endpoint: Sendable {
     // MARK: - System
     case health
 
+    // MARK: - Auth
+    case register(AuthRegisterRequest)
+    case login(AuthLoginRequest)
+    case refreshToken
+
     // MARK: - Children
     case createChild(ChildCreate)
     case listChildren
@@ -27,6 +32,7 @@ public enum Endpoint: Sendable {
     case getActivePlan(childId: UUID)
     case getPlan(UUID)
     case createPlan(childId: UUID)
+    case listPlans(childId: UUID, limit: Int = 20, offset: Int = 0)
     case updateDayTaskCompletion(planId: UUID, dayNumber: Int, DayTaskCompletionUpdate)
 
     // MARK: - AI Sessions
@@ -54,21 +60,35 @@ public enum Endpoint: Sendable {
     case messageClicked(UUID)
     case messageDelivered(UUID)
 
+    // MARK: - Devices
+    case registerDevice(DeviceRegisterRequest)
+
+    // MARK: - Plans (Focus Note)
+    case appendFocusNote(planId: UUID, PlanFocusNoteUpdate)
+
+    // MARK: - Files
+    case uploadFile
+
+    // MARK: - Consult Prep
+    case getConsultPrep(childId: UUID)
+
     // MARK: - Computed Properties
 
     public var method: String {
         switch self {
         case .health, .listChildren, .getChild, .listRecords, .getRecord,
-             .getActivePlan, .getPlan, .homeSummary, .getFeedback,
+             .getActivePlan, .getPlan, .listPlans, .homeSummary, .getFeedback,
              .listMessages, .unreadCount, .getMessage, .getSession,
-             .getProfile:
+             .getProfile, .getConsultPrep:
             return "GET"
-        case .updateChild, .updateMessage, .updateProfile:
+        case .updateChild, .updateMessage, .updateProfile, .appendFocusNote:
             return "PATCH"
-        case .createChild, .refreshStage, .completeOnboarding,
+        case .register, .login, .refreshToken,
+             .createChild, .refreshStage, .completeOnboarding,
              .createRecord, .createPlan, .updateDayTaskCompletion,
              .instantHelp, .createFeedback, .markFeedbackViewed,
-             .submitDecision, .messageClicked, .messageDelivered:
+             .submitDecision, .messageClicked, .messageDelivered,
+             .registerDevice, .uploadFile:
             return "POST"
         }
     }
@@ -77,6 +97,14 @@ public enum Endpoint: Sendable {
         switch self {
         case .health:
             return "/health"
+
+        // Auth
+        case .register:
+            return "/api/v1/auth/register"
+        case .login:
+            return "/api/v1/auth/login"
+        case .refreshToken:
+            return "/api/v1/auth/refresh"
 
         // Children
         case .createChild:
@@ -106,6 +134,8 @@ public enum Endpoint: Sendable {
         case .getPlan(let id):
             return "/api/v1/plans/\(id.uuidString)"
         case .createPlan:
+            return "/api/v1/plans"
+        case .listPlans:
             return "/api/v1/plans"
         case .updateDayTaskCompletion(let planId, let day, _):
             return "/api/v1/plans/\(planId.uuidString)/days/\(day)/completion"
@@ -147,6 +177,22 @@ public enum Endpoint: Sendable {
             return "/api/v1/messages/\(id.uuidString)/clicked"
         case .messageDelivered(let id):
             return "/api/v1/messages/\(id.uuidString)/delivered"
+
+        // Devices
+        case .registerDevice:
+            return "/api/v1/devices"
+
+        // Plans (Focus Note)
+        case .appendFocusNote(let planId, _):
+            return "/api/v1/plans/\(planId.uuidString)/focus-note"
+
+        // Files
+        case .uploadFile:
+            return "/api/v1/files/upload"
+
+        // Consult Prep
+        case .getConsultPrep:
+            return "/api/v1/consult-prep"
         }
     }
 
@@ -168,6 +214,13 @@ public enum Endpoint: Sendable {
         case .getActivePlan(let childId):
             return [URLQueryItem(name: "child_id", value: childId.uuidString)]
 
+        case .listPlans(let childId, let limit, let offset):
+            return [
+                URLQueryItem(name: "child_id", value: childId.uuidString),
+                URLQueryItem(name: "limit", value: String(limit)),
+                URLQueryItem(name: "offset", value: String(offset))
+            ]
+
         case .homeSummary(let childId):
             return [URLQueryItem(name: "child_id", value: childId.uuidString)]
 
@@ -178,6 +231,9 @@ public enum Endpoint: Sendable {
             }
             return items
 
+        case .getConsultPrep(let childId):
+            return [URLQueryItem(name: "child_id", value: childId.uuidString)]
+
         default:
             return nil
         }
@@ -185,6 +241,8 @@ public enum Endpoint: Sendable {
 
     public var body: (any Encodable & Sendable)? {
         switch self {
+        case .register(let data): return data
+        case .login(let data): return data
         case .createChild(let data): return data
         case .updateChild(_, let data): return data
         case .createRecord(let data): return data
@@ -195,6 +253,8 @@ public enum Endpoint: Sendable {
         case .submitDecision(_, let data): return data
         case .updateMessage(_, let data): return data
         case .updateProfile(let data): return data
+        case .registerDevice(let data): return data
+        case .appendFocusNote(_, let data): return data
         default: return nil
         }
     }
@@ -210,7 +270,7 @@ public enum Endpoint: Sendable {
     /// 期望的成功状态码
     public var expectedStatusCode: Int {
         switch self {
-        case .createChild, .createRecord, .createPlan, .instantHelp:
+        case .register, .createChild, .createRecord, .createPlan, .instantHelp, .registerDevice, .uploadFile:
             return 201
         case .createFeedback:
             return 202

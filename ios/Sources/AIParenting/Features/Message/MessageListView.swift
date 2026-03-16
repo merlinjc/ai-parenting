@@ -2,10 +2,11 @@ import SwiftUI
 
 /// 消息列表视图
 ///
-/// 未读优先排序、游标分页、消息卡片、滑动标已读。
+/// 未读优先排序、游标分页、消息卡片（点击深链到目标页）、risk_alert 特殊样式。
 public struct MessageListView: View {
 
     @Environment(APIClient.self) private var apiClient
+    @Environment(AppState.self) private var appState
     @State private var viewModel: MessageViewModel?
 
     public init() {}
@@ -101,7 +102,7 @@ public struct MessageListView: View {
         }
     }
 
-    // MARK: - Message Card
+    // MARK: - Message Card（支持深链导航）
 
     private func messageCard(_ message: MessageResponse, vm: MessageViewModel) -> some View {
         Button {
@@ -110,13 +111,15 @@ public struct MessageListView: View {
                 if message.readStatus == "unread" {
                     await vm.markAsRead(message.id)
                 }
+                // 根据 targetPage 执行深链导航
+                navigateToTarget(message)
             }
         } label: {
             HStack(alignment: .top, spacing: 12) {
                 // 类型图标
                 ZStack {
                     Circle()
-                        .fill(messageTypeColor(message.type).opacity(0.12))
+                        .fill(messageTypeColor(message.type).opacity(message.isRiskAlert ? 0.2 : 0.12))
                         .frame(width: 40, height: 40)
 
                     Image(systemName: messageTypeIcon(message.type))
@@ -129,7 +132,7 @@ public struct MessageListView: View {
                         Text(message.title)
                             .font(.subheadline)
                             .fontWeight(message.readStatus == "unread" ? .bold : .regular)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(message.isRiskAlert ? .red : .primary)
                             .lineLimit(1)
 
                         Spacer()
@@ -143,19 +146,74 @@ public struct MessageListView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
+
+                    // 深链目标提示
+                    if let targetPage = message.targetPage {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.right.circle")
+                                .font(.caption2)
+                            Text(targetPageLabel(targetPage))
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundStyle(messageTypeColor(message.type))
+                        .padding(.top, 2)
+                    }
                 }
 
                 // 未读指示点
                 if message.readStatus == "unread" {
                     Circle()
-                        .fill(.blue)
+                        .fill(message.isRiskAlert ? .red : .blue)
                         .frame(width: 8, height: 8)
                 }
             }
             .padding(.horizontal)
             .padding(.vertical, 10)
+            .background(
+                message.isRiskAlert
+                    ? RoundedRectangle(cornerRadius: 8).fill(.red.opacity(0.04)).eraseToAnyView()
+                    : RoundedRectangle(cornerRadius: 8).fill(.clear).eraseToAnyView()
+            )
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Deep Link Navigation
+
+    private func navigateToTarget(_ message: MessageResponse) {
+        guard let targetPage = message.targetPage else { return }
+        let params = message.parsedTargetParams
+
+        switch targetPage {
+        case "plan_detail":
+            if let planIdStr = params?.planId, let planId = UUID(uuidString: planIdStr) {
+                appState.navigate(to: .planDetail(planId: planId))
+            } else {
+                appState.navigate(to: .planDetail(planId: UUID()))
+            }
+
+        case "record_create":
+            appState.navigate(to: .recordCreate(sourcePlanId: nil, sourceSessionId: nil, theme: nil))
+
+        case "record_list":
+            appState.navigate(to: .recordList)
+
+        case "weekly_feedback":
+            if let feedbackIdStr = params?.feedbackId, let feedbackId = UUID(uuidString: feedbackIdStr) {
+                appState.navigate(to: .weeklyFeedback(feedbackId: feedbackId))
+            }
+
+        default:
+            break
+        }
+
+        // 如果是 risk_alert，额外触发 child 数据刷新
+        if message.isRiskAlert {
+            Task {
+                await appState.refreshActiveChild()
+            }
+        }
     }
 
     // MARK: - Helpers
@@ -165,7 +223,7 @@ public struct MessageListView: View {
         case "plan_reminder": return "calendar.badge.clock"
         case "record_prompt": return "square.and.pencil"
         case "weekly_feedback_ready": return "chart.bar.doc.horizontal"
-        case "risk_alert": return "exclamationmark.triangle"
+        case "risk_alert": return "exclamationmark.triangle.fill"
         case "system": return "bell"
         default: return "bell"
         }
@@ -180,5 +238,23 @@ public struct MessageListView: View {
         case "system": return .gray
         default: return .gray
         }
+    }
+
+    private func targetPageLabel(_ targetPage: String) -> String {
+        switch targetPage {
+        case "plan_detail": return "查看计划"
+        case "record_create": return "去记录"
+        case "record_list": return "查看记录"
+        case "weekly_feedback": return "查看周反馈"
+        default: return "查看详情"
+        }
+    }
+}
+
+// MARK: - View Type Eraser
+
+extension View {
+    func eraseToAnyView() -> AnyView {
+        AnyView(self)
     }
 }

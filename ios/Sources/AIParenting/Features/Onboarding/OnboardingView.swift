@@ -20,6 +20,7 @@ public struct OnboardingView: View {
     @State private var birthYear = Calendar.current.component(.year, from: Date()) - 2
     @State private var birthMonth = Calendar.current.component(.month, from: Date())
     @State private var selectedThemes: Set<FocusTheme> = []
+    @State private var recentSituation = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
 
@@ -259,6 +260,23 @@ public struct OnboardingView: View {
             }
             .padding(.horizontal, 24)
 
+            // 近况描述（可选）
+            VStack(alignment: .leading, spacing: 8) {
+                Text("近况一句话（可选）")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Text("简单描述孩子最近的状态，帮助 AI 生成更贴合的第一份计划")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextField("例如：最近开始对同龄小朋友感兴趣了", text: $recentSituation, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...4)
+                    .font(.body)
+            }
+            .padding(.horizontal, 24)
+
             Spacer()
         }
     }
@@ -289,6 +307,9 @@ public struct OnboardingView: View {
                 confirmRow(label: "出生年月", value: "\(birthYear)年\(birthMonth)月")
                 confirmRow(label: "月龄", value: "约 \(computeAgeMonths()) 个月")
                 confirmRow(label: "关注方向", value: selectedThemes.isEmpty ? "未选择" : selectedThemes.map(\.displayName).joined(separator: "、"))
+                if !recentSituation.trimmingCharacters(in: .whitespaces).isEmpty {
+                    confirmRow(label: "近况", value: recentSituation.trimmingCharacters(in: .whitespaces))
+                }
             }
             .padding()
             .background(
@@ -390,6 +411,17 @@ public struct OnboardingView: View {
 
             // 4. 刷新 AppState
             await appState.refreshChildren()
+
+            // 5. 自动生成首份计划（静默失败，不阻塞引导完成）
+            Task {
+                do {
+                    let _: PlanResponse = try await apiClient.request(.createPlan(childId: child.id))
+                } catch {
+                    // 静默失败：首份计划生成失败不影响引导流程
+                    // 用户后续可在首页手动触发
+                    print("[Onboarding] Auto-plan generation failed: \(error)")
+                }
+            }
 
         } catch let apiError as APIError {
             errorMessage = apiError.localizedDescription

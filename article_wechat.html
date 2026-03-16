@@ -3,74 +3,120 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 育儿助手不是低龄版作业帮，而是家庭支持型 AI 教育产品</title>
+<title>AI 育儿助手不是低龄版作业帮，而是家庭支持型 AI 教育产品（微信公众号版）</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:16px;scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
-body{font-family:"Noto Serif SC","Source Han Serif SC",Georgia,serif;background:#f5f0eb;color:#2c2c2c;line-height:1.9;letter-spacing:.02em}
-:root{--ac:#8b4513;--ac2:#a0522d;--bg:#fffdf9;--aside:#faf6f1;--brd:#e0d5c8;--t1:#2c2c2c;--t2:#5a5a5a;--t3:#8a8a8a;--gold:#b8860b;--blue:#1a3a5c;--green:#3d6b4f}
-.hero{background:linear-gradient(135deg,#1a1a2e,#16213e 40%,#0f3460);color:#fff;padding:80px 24px 70px;text-align:center;position:relative;overflow:hidden}
-.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(139,69,19,.15),transparent 60%),radial-gradient(ellipse at 70% 30%,rgba(184,134,11,.1),transparent 60%);pointer-events:none}
-.hero-inner{max-width:820px;margin:0 auto;position:relative;z-index:1}
-.hero-label{display:inline-block;font-family:"Noto Sans SC",sans-serif;font-size:.75rem;font-weight:600;letter-spacing:.15em;color:var(--gold);border:1px solid rgba(184,134,11,.5);padding:4px 16px;border-radius:2px;margin-bottom:28px}
-.hero h1{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:700;line-height:1.35;margin-bottom:18px}
-.hero-sub{font-size:clamp(1rem,2vw,1.2rem);color:rgba(255,255,255,.72);line-height:1.7;max-width:680px;margin:0 auto 32px}
-.hero-meta{font-family:"Noto Sans SC",sans-serif;font-size:.82rem;color:rgba(255,255,255,.48);letter-spacing:.05em}
-.hero-meta span+span::before{content:" \00b7 ";margin:0 6px}
-.wrap{max-width:780px;margin:-32px auto 0;padding:0 24px 80px;position:relative;z-index:2}
-.card{background:var(--bg);border-radius:4px;box-shadow:0 2px 24px rgba(0,0,0,.06);padding:56px 64px}
-@media(max-width:768px){.card{padding:36px 24px}}
-.abs{background:var(--aside);border-left:4px solid var(--ac);padding:28px 32px;margin-bottom:48px;border-radius:0 4px 4px 0}
-.abs-label{font-family:"Noto Sans SC",sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--ac);margin-bottom:10px;display:block}
-.abs p{font-size:.95rem;color:var(--t2);line-height:1.95;text-indent:2em}
-h2.sh{font-size:1.5rem;font-weight:700;color:var(--blue);margin:56px 0 24px;padding-bottom:12px;border-bottom:2px solid var(--brd);line-height:1.4}
-h2.sh:first-child{margin-top:0}
-h3.sub{font-size:1.15rem;font-weight:600;color:var(--t1);margin:36px 0 16px;line-height:1.5}
-.card p{font-size:1.02rem;line-height:1.95;margin-bottom:18px;text-align:justify;text-indent:2em}
-.card strong{color:var(--t1);font-weight:700}
-.pq{border-left:3px solid var(--gold);margin:36px 0;padding:20px 28px;background:linear-gradient(90deg,rgba(184,134,11,.04),transparent);border-radius:0 4px 4px 0}
-.pq p{font-size:1.05rem;font-weight:600;color:var(--blue);line-height:1.8;text-indent:0!important;margin-bottom:0}
-.tw{overflow-x:auto;margin:28px 0 32px;border-radius:4px;border:1px solid var(--brd)}
-table{width:100%;border-collapse:collapse;font-size:.9rem;line-height:1.7}
-thead{background:var(--blue);color:#fff}
-thead th{padding:14px 16px;text-align:left;font-weight:600;font-family:"Noto Sans SC",sans-serif;font-size:.82rem;letter-spacing:.03em}
-tbody td{padding:12px 16px;border-bottom:1px solid #eee;vertical-align:top;text-indent:0}
-tbody tr:last-child td{border-bottom:none}
-tbody tr:nth-child(even){background:#faf8f5}
-tbody td:first-child{font-weight:600;color:var(--ac)}
-.ref{font-size:.75em;vertical-align:super;color:var(--ac2);font-weight:600}
-hr.sep{border:none;height:1px;background:var(--brd);margin:48px auto;max-width:120px}
-.refs{margin-top:56px;padding-top:32px;border-top:2px solid var(--brd)}
-.refs h2{font-size:1.2rem;font-weight:700;color:var(--blue);margin-bottom:20px}
-.rl{list-style:none;padding:0}
-.rl li{font-size:.85rem;line-height:1.7;color:var(--t2);margin-bottom:10px;padding-left:2.2em;text-indent:-2.2em;text-align:left}
+html{font-size:16px;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  background:#f5f5f5;color:#333;line-height:2;letter-spacing:.03em;
+  -webkit-overflow-scrolling:touch;
+  word-wrap:break-word;overflow-wrap:break-word;
+}
+:root{--ac:#6b3410;--ac2:#c0392b;--bg:#ffffff;--aside:#f7f7f7;--brd:#e0e0e0;--t1:#1a1a1a;--t2:#444;--t3:#888;--gold:#996b00;--blue:#12304d;--green:#2d5a3f}
 
+/* ========== Hero ========== */
+.hero{background:linear-gradient(135deg,#1a1a2e,#16213e 40%,#0f3460);color:#fff;padding:56px 20px 48px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(139,69,19,.15),transparent 60%),radial-gradient(ellipse at 70% 30%,rgba(184,134,11,.1),transparent 60%);pointer-events:none}
+.hero-inner{max-width:680px;margin:0 auto;position:relative;z-index:1}
+.hero-label{display:inline-block;font-size:.7rem;font-weight:600;letter-spacing:.12em;color:var(--gold);border:1px solid rgba(184,134,11,.5);padding:3px 12px;border-radius:2px;margin-bottom:20px}
+.hero h1{font-size:1.4rem;font-weight:700;line-height:1.5;margin-bottom:14px;letter-spacing:.02em}
+.hero-sub{font-size:.9rem;color:rgba(255,255,255,.72);line-height:1.8;max-width:560px;margin:0 auto 24px}
+.hero-meta{font-size:.75rem;color:rgba(255,255,255,.48);letter-spacing:.05em}
+.hero-meta span+span::before{content:" \00b7 ";margin:0 4px}
+
+/* ========== Main Layout ========== */
+.wrap{max-width:100%;margin:0 auto;padding:0 0 40px;position:relative;z-index:2}
+.card{background:var(--bg);padding:28px 20px;border-radius:0}
+
+/* ========== Abstract ========== */
+.abs{background:var(--aside);border-left:2px solid var(--ac);padding:20px 16px;margin-bottom:32px;border-radius:0 4px 4px 0}
+.abs-label{font-size:.7rem;font-weight:700;letter-spacing:.1em;color:var(--ac);margin-bottom:8px;display:block}
+.abs p{font-size:.9rem;color:var(--t2);line-height:2;text-indent:2em}
+
+/* ========== Headings ========== */
+h2.sh{font-size:1.2rem;font-weight:700;color:var(--blue);margin:40px 0 18px;padding-bottom:10px;border-bottom:1px solid var(--brd);line-height:1.5}
+h2.sh:first-child{margin-top:0}
+h3.sub{font-size:1.05rem;font-weight:600;color:var(--t1);margin:28px 0 14px;line-height:1.6}
+
+/* ========== Body Text ========== */
+.card p{font-size:.95rem;line-height:2;margin-bottom:16px;text-align:justify;text-indent:2em}
+.card strong{color:#111;font-weight:700}
+
+/* ========== Pull Quotes ========== */
+.pq{border-left:2px solid var(--gold);margin:28px 0;padding:16px 16px;background:linear-gradient(90deg,rgba(184,134,11,.04),transparent);border-radius:0 4px 4px 0}
+.pq p{font-size:.95rem;font-weight:600;color:#0d2640;line-height:1.9;text-indent:0!important;margin-bottom:0}
+
+/* ========== Tables — mobile-friendly ========== */
+.tw{overflow-x:auto;margin:20px 0 24px;-webkit-overflow-scrolling:touch;border:1px solid var(--brd);border-radius:4px}
+table{width:100%;border-collapse:collapse;font-size:.82rem;line-height:1.7;table-layout:fixed;word-break:break-word}
+thead{background:var(--blue);color:#fff}
+thead th{padding:10px 10px;text-align:left;font-weight:600;font-size:.76rem;letter-spacing:.03em}
+tbody td{padding:10px 10px;border-bottom:1px solid #eee;vertical-align:top;text-indent:0}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:nth-child(even){background:#f8f8f6}
+tbody td:first-child{font-weight:600;color:var(--ac)}
+
+/* ========== References ========== */
+.ref{font-size:.72em;vertical-align:super;color:var(--ac2);font-weight:700}
+hr.sep{border:none;height:1px;background:var(--brd);margin:36px auto;max-width:80px}
+.refs{margin-top:40px;padding-top:24px;border-top:1px solid var(--brd)}
+.refs h2{font-size:1.05rem;font-weight:700;color:var(--blue);margin-bottom:16px}
+.rl{list-style:none;padding:0}
+.rl li{font-size:.78rem;line-height:1.8;color:var(--t2);margin-bottom:8px;padding-left:2em;text-indent:-2em;text-align:left}
 .rn{font-weight:700;color:var(--ac)}
-.foot{text-align:center;padding:40px 24px;font-family:"Noto Sans SC",sans-serif;font-size:.78rem;color:var(--t3)}
-code{font-family:Menlo,Consolas,monospace;font-size:.88em;background:#f0ece6;padding:2px 6px;border-radius:3px;color:var(--ac)}
-.tocbtn{position:fixed;top:20px;right:20px;z-index:100;background:var(--blue);color:#fff;border:none;padding:10px 16px;font-size:.82rem;font-family:"Noto Sans SC",sans-serif;cursor:pointer;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,.15)}
-.tocbtn:hover{opacity:.9}
-.tocp{position:fixed;top:0;right:-320px;width:300px;height:100vh;background:var(--bg);box-shadow:-4px 0 24px rgba(0,0,0,.1);z-index:99;padding:72px 24px 32px;overflow-y:auto;transition:right .3s}
-.tocp.open{right:0}
-.tocp h3{font-size:.9rem;font-weight:700;color:var(--blue);margin-bottom:16px}
-.tocp ul{list-style:none;padding:0}
-.tocp li{margin-bottom:8px}
-.tocp a{font-family:"Noto Sans SC",sans-serif;font-size:.85rem;color:var(--t2);text-decoration:none;display:block;padding:4px 0}
-.tocp a:hover{color:var(--ac)}
-@media print{.hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}.tocbtn,.tocp{display:none!important}.card{box-shadow:none;padding:32px 0}body{background:#fff}}
+
+/* ========== Footer ========== */
+.foot{text-align:center;padding:32px 20px;font-size:.74rem;color:var(--t3)}
+
+/* ========== Code ========== */
+code{font-family:Menlo,Consolas,monospace;font-size:.82em;background:#ece6dc;padding:1px 5px;border-radius:3px;color:#5a2d0c;word-break:break-all}
+
+/* ========== Table of Contents ========== */
+.toc-static{background:var(--aside);border:1px solid var(--brd);border-radius:4px;padding:18px 16px;margin-bottom:32px}
+.toc-static h3{font-size:.85rem;font-weight:700;color:var(--blue);margin-bottom:10px}
+.toc-static ul{list-style:none;padding:0;margin:0}
+.toc-static li{font-size:.82rem;color:var(--t2);padding:5px 0;margin-bottom:2px;border-bottom:1px dashed #eee}
+.toc-static li:last-child{border-bottom:none}
+
+/* ========== Responsive — Small Phones ========== */
+@media(max-width:375px){
+  .hero{padding:40px 16px 36px}
+  .hero h1{font-size:1.2rem}
+  .hero-sub{font-size:.82rem}
+  .card{padding:22px 16px}
+  .card p{font-size:.9rem}
+  h2.sh{font-size:1.1rem}
+  h3.sub{font-size:1rem}
+  table{font-size:.76rem}
+  thead th{padding:8px 8px;font-size:.72rem}
+  tbody td{padding:8px 8px}
+}
+
+/* ========== Responsive — Tablets & larger ========== */
+@media(min-width:768px){
+  .hero{padding:72px 24px 64px}
+  .hero h1{font-size:1.8rem}
+  .hero-sub{font-size:1rem}
+  .wrap{max-width:720px;margin:-24px auto 0;padding:0 24px 60px}
+  .card{padding:48px 52px;border-radius:4px;box-shadow:0 2px 24px rgba(0,0,0,.06)}
+  .card p{font-size:1rem}
+  h2.sh{font-size:1.35rem;margin:48px 0 22px}
+  h3.sub{font-size:1.1rem}
+  .abs{padding:24px 28px}
+  .abs p{font-size:.92rem}
+  .pq{padding:18px 24px}
+  .tw{margin:24px 0 28px}
+  table{font-size:.88rem;table-layout:auto}
+  thead th{padding:12px 14px;font-size:.8rem}
+  tbody td{padding:11px 14px}
+}
+
+/* ========== Print ========== */
+@media print{.hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}.card{box-shadow:none;padding:32px 0}body{background:#fff}}
 </style>
 </head>
 <body>
-<button class="tocbtn" onclick="document.getElementById('toc').classList.toggle('open')">&#9776; 目录</button>
-<nav id="toc" class="tocp"><h3>文章目录</h3><ul>
-<li><a href="#s1" onclick="document.getElementById('toc').classList.remove('open')">一、问题的起点</a></li>
-<li><a href="#s2" onclick="document.getElementById('toc').classList.remove('open')">二、范式比较</a></li>
-<li><a href="#s3" onclick="document.getElementById('toc').classList.remove('open')">三、非诊断化安全框架</a></li>
-<li><a href="#s4" onclick="document.getElementById('toc').classList.remove('open')">四、行业趋势</a></li>
-<li><a href="#s5" onclick="document.getElementById('toc').classList.remove('open')">五、风险与挑战</a></li>
-<li><a href="#s6" onclick="document.getElementById('toc').classList.remove('open')">六、结语</a></li>
-<li><a href="#rf" onclick="document.getElementById('toc').classList.remove('open')">参考引用</a></li>
-</ul></nav>
 
 <header class="hero"><div class="hero-inner">
 <span class="hero-label">深度分析 &middot; AI &amp; Education</span>
@@ -81,10 +127,20 @@ code{font-family:Menlo,Consolas,monospace;font-size:.88em;background:#f0ece6;pad
 
 <main class="wrap"><article class="card">
 
-<div class="abs"><span class="abs-label">摘 要 &mdash; Abstract</span>
-<p>当前主流 AI 教育产品&mdash;&mdash;以猿辅导&ldquo;小猿 AI&rdquo;和作业帮 AI 学习机为代表&mdash;&mdash;正在将大模型能力集中于 K12 阶段的个性化讲解、错因分析与学情诊断，其核心逻辑是<strong>让 AI 更像一位高效的老师</strong>。本文基于本人最近在探索的一个面向 18&mdash;48 月龄幼儿家长的 AI 育儿助手项目与行业的对照，提出一个不同的判断：该项目不是&ldquo;面向低龄儿童的教育 App&rdquo;，而是<strong>将 AI 教育从知识传递推进到家庭支持的一种早期形态</strong>。它的核心创新不在于&ldquo;AI 更懂育儿&rdquo;，而在于&ldquo;AI 更知道在什么时候不该下判断&rdquo;。文章将从范式差异、非诊断化安全框架和未来趋势三个层面展开论证，并在行文中引用行业报告、产品公开信息与学术讨论作为佐证。该项目已开源，完整源码见 <span style="color:var(--ac2);font-weight:600">https://github.com/merlinjc/ai-parenting</span>。</p></div>
+<div class="toc-static"><h3>文章目录</h3><ul>
+<li>一、问题的起点</li>
+<li>二、范式比较</li>
+<li>三、非诊断化安全框架</li>
+<li>四、行业趋势</li>
+<li>五、风险与挑战</li>
+<li>六、结语</li>
+<li>参考引用</li>
+</ul></div>
 
-<h2 class="sh" id="s1">一、问题的起点：为什么不能把它当作&ldquo;低龄版 K12 产品&rdquo;来理解</h2>
+<div class="abs"><span class="abs-label">摘 要 &mdash; Abstract</span>
+<p>当前主流 AI 教育产品&mdash;&mdash;以猿辅导&ldquo;小猿 AI&rdquo;和作业帮 AI 学习机为代表&mdash;&mdash;正在将大模型能力集中于 K12 阶段的个性化讲解、错因分析与学情诊断，其核心逻辑是<strong>让 AI 更像一位高效的老师</strong>。本文基于本人最近在探索的一个面向 18&mdash;48 月龄幼儿家长的 AI 育儿助手项目与行业的对照，提出一个不同的判断：该项目不是&ldquo;面向低龄儿童的教育 App&rdquo;，而是<strong>将 AI 教育从知识传递推进到家庭支持的一种早期形态</strong>。它的核心创新不在于&ldquo;AI 更懂育儿&rdquo;，而在于&ldquo;AI 更知道在什么时候不该下判断&rdquo;。文章将从范式差异、非诊断化安全框架和未来趋势三个层面展开论证，并在行文中引用行业报告、产品公开信息与学术讨论作为佐证。该项目已开源，完整源码见 GitHub（merlinjc/ai-parenting）。</p></div>
+
+<h2 class="sh">一、问题的起点：为什么不能把它当作&ldquo;低龄版 K12 产品&rdquo;来理解</h2>
 
 <p>2025 年以来，AI 与教育的结合已经从&ldquo;是否使用&rdquo;转向&ldquo;如何用好&rdquo;。据 Engageli 引用 Microsoft、McKinsey、Pew Research Center 等机构的统计，截至 2025&mdash;2026 学年，85% 的教师和 86% 的学生已经在教学活动中使用了 AI 工具，全球 AI 教育市场规模在 2025 年达到 70.5 亿美元，预计到 2035 年将增长至 1367.9 亿美元，复合年增长率约 35%<span class="ref">[1]</span>。在中国，据 MoonFox 发布的《2025 年中国教育行业 AI 应用专题分析报告》，教育垂直大模型已超过 100 个，覆盖口语陪练、解题、写作、学情分析等功能，2023 年教育学习终端出货量达到 9930 万台<span class="ref">[2]</span>。</p>
 
@@ -98,7 +154,7 @@ code{font-family:Menlo,Consolas,monospace;font-size:.88em;background:#f0ece6;pad
 
 <hr class="sep">
 
-<h2 class="sh" id="s2">二、范式比较：它和猿辅导、作业帮到底不是一类产品</h2>
+<h2 class="sh">二、范式比较：它和猿辅导、作业帮到底不是一类产品</h2>
 
 <p>为了让这个判断不停留在概念层面，有必要从多个维度进行结构化比较。以下比较的一侧，是 2025 年公开发布的猿辅导&ldquo;小猿 AI&rdquo;和作业帮 AI 学习机，它们是当前中国 K12 AI 教育的典型代表；另一侧，是本人最近在探索的这个 AI 育儿助手项目。</p>
 
@@ -137,7 +193,7 @@ code{font-family:Menlo,Consolas,monospace;font-size:.88em;background:#f0ece6;pad
 
 <hr class="sep">
 
-<h2 class="sh" id="s3">三、核心能力拆解：非诊断化安全框架为什么是产品灵魂</h2>
+<h2 class="sh">三、核心能力拆解：非诊断化安全框架为什么是产品灵魂</h2>
 
 <p>&ldquo;非诊断化安全框架&rdquo;不是一个附属功能或合规模块，而是本人探索的这个项目的<strong>产品宪法</strong>。它规定的不是 AI 能说多少，而是 AI<strong>在这个场景里拥有多大解释权与判断权</strong>。从源码中可以看到，这套框架被落实为三个工程层级：<strong>语言禁区、风险分层、权威让渡</strong><span class="ref">[5][8][9]</span>。</p>
 
@@ -195,7 +251,7 @@ code{font-family:Menlo,Consolas,monospace;font-size:.88em;background:#f0ece6;pad
 
 <hr class="sep">
 
-<h2 class="sh" id="s4">四、行业趋势：AI 教育正在从&ldquo;讲题&rdquo;走向&ldquo;支持家庭&rdquo;</h2>
+<h2 class="sh">四、行业趋势：AI 教育正在从&ldquo;讲题&rdquo;走向&ldquo;支持家庭&rdquo;</h2>
 
 <p>本人探索的这个项目的意义不仅在于它自身的产品设计，还在于它可能预示着 AI 教育领域一个更广泛的趋势转向。综合行业报告与学术讨论，可以将这一转向收束为以下五条主线。</p>
 
@@ -233,7 +289,7 @@ code{font-family:Menlo,Consolas,monospace;font-size:.88em;background:#f0ece6;pad
 
 <hr class="sep">
 
-<h2 class="sh" id="s5">五、风险与挑战：这条路线并不轻松</h2>
+<h2 class="sh">五、风险与挑战：这条路线并不轻松</h2>
 
 <p>任何分析如果只讲机会不讲困难，都会流于乐观判断。本人探索的这个项目所代表的&ldquo;家庭支持型 AI 教育&rdquo;路线，同样面临严峻挑战。</p>
 
@@ -249,7 +305,7 @@ code{font-family:Menlo,Consolas,monospace;font-size:.88em;background:#f0ece6;pad
 
 <hr class="sep">
 
-<h2 class="sh" id="s6">六、结语</h2>
+<h2 class="sh">六、结语</h2>
 
 <p>回到本文的起点。如果只从年龄段来理解 AI 育儿助手&mdash;&mdash;&ldquo;它是面向 0-6 岁的&rdquo;&mdash;&mdash;那它只是一个细分市场产品。但如果从 AI 角色、教育目标和责任边界来理解它，它其实是<strong>AI 教育从 1.0 的工具化（搜题、题库）、2.0 的个性化（一对一讲解、学情诊断），走向 3.0 的全人发展支持（从&ldquo;学什么&rdquo;到&ldquo;怎么成长&rdquo;，从学生扩展到家庭系统）</strong>的一个早期样本。</p>
 
@@ -258,28 +314,28 @@ code{font-family:Menlo,Consolas,monospace;font-size:.88em;background:#f0ece6;pad
 <div class="pq"><p><strong>未来真正有价值的教育 AI，未必最像老师，但一定更懂得如何支持一个真实家庭。</strong></p></div>
 
 <!-- References -->
-<div class="refs" id="rf">
+<div class="refs">
 <h2>参考引用</h2>
 <ol class="rl">
-<li><span class="rn">[1]</span> Lindsey Seril, &ldquo;25 AI in Education Statistics to Guide Your Learning Strategy in 2026,&rdquo; <em>Engageli</em>, March 3, 2026. https://www.engageli.com/blog/ai-in-education-statistics</li>
-<li><span class="rn">[2]</span> MoonFox,《2025 年中国教育行业 AI 应用专题分析报告》，2025 年。https://www.sohu.com/a/900579200_121948640</li>
-<li><span class="rn">[3]</span> 搜狐科技，&ldquo;猿辅导推出小猿 AI，虚拟老师实现 1 对 1 个性化讲解&rdquo;，2025-04-15。https://www.sohu.com/a/885067265_121924584</li>
-<li><span class="rn">[4]</span> 36 氪，&ldquo;作业帮推出 AI 老师一对一学习机&rdquo;。https://36kr.com/newsflashes/2230545197995401</li>
-<li><span class="rn">[5]</span> 项目源码：<code>src/ai_parenting/templates/instant_help.py</code> https://github.com/merlinjc/ai-parenting/blob/main/src/ai_parenting/templates/instant_help.py</li>
-<li><span class="rn">[6]</span> 项目源码：<code>src/ai_parenting/templates/plan_generation.py</code> https://github.com/merlinjc/ai-parenting/blob/main/src/ai_parenting/templates/plan_generation.py</li>
-<li><span class="rn">[7]</span> 项目源码：<code>src/ai_parenting/templates/weekly_feedback.py</code> https://github.com/merlinjc/ai-parenting/blob/main/src/ai_parenting/templates/weekly_feedback.py</li>
-<li><span class="rn">[8]</span> 项目源码：<code>src/ai_parenting/engine/boundary_checker.py</code> https://github.com/merlinjc/ai-parenting/blob/main/src/ai_parenting/engine/boundary_checker.py</li>
-<li><span class="rn">[9]</span> 项目源码：<code>src/ai_parenting/models/enums.py</code> https://github.com/merlinjc/ai-parenting/blob/main/src/ai_parenting/models/enums.py</li>
-<li><span class="rn">[10]</span> Lory Seraydarian, &ldquo;AI Parenting: Ethical Dilemmas in Raising Gen Alpha,&rdquo; <em>Plat.AI</em>, 2024-09-06. https://plat.ai/blog/ai-in-parenting/</li>
-<li><span class="rn">[11]</span> 项目源码：<code>src/ai_parenting/backend/services/ai_session_service.py</code> https://github.com/merlinjc/ai-parenting/blob/main/src/ai_parenting/backend/services/ai_session_service.py</li>
-<li><span class="rn">[12]</span> 项目源码：<code>src/ai_parenting/templates/degraded.py</code> https://github.com/merlinjc/ai-parenting/blob/main/src/ai_parenting/templates/degraded.py</li>
-<li><span class="rn">[13]</span> UNESCO,《教育和研究领域生成式人工智能使用指南》，2023-09-07。https://www.sohu.com/a/827803301_121956424</li>
-<li><span class="rn">[14]</span> 产业调研网,《中国早教市场调研与行业前景预测报告（2025 年版）》。https://txt.cir.cn/1502A25.html</li>
-<li><span class="rn">[15]</span> Microsoft Education, &ldquo;AI in Education Report,&rdquo; August 2025. https://www.microsoft.com/en-us/education/blog/2025/08/ai-in-education-report-insights-to-support-teaching-and-learning/</li>
-<li><span class="rn">[16]</span> 搜狐科技，&ldquo;猿辅导推出小猿 AI 学习机&rdquo;，2025-04-15。https://www.sohu.com/a/885353613_121924584</li>
-<li><span class="rn">[17]</span> 新浪财经，&ldquo;猿辅导发布小猿 AI 学习机&rdquo;，2025-04-15。https://finance.sina.com.cn/roll/2025-04-15/doc-inetftfw4390876.shtml</li>
-<li><span class="rn">[18]</span> 搜狐，&ldquo;2025 年 AI 教育前景：技术与应用全面剖析&rdquo;。https://www.sohu.com/a/879555551_122006510</li>
-<li><span class="rn">[19]</span> 搜狐，&ldquo;2025 年中国教育行业 AI 应用研究报告&rdquo;。https://www.sohu.com/a/991221805_121872248</li>
+<li><span class="rn">[1]</span> Lindsey Seril, &ldquo;25 AI in Education Statistics to Guide Your Learning Strategy in 2026,&rdquo; <em>Engageli</em>, March 3, 2026.</li>
+<li><span class="rn">[2]</span> MoonFox,《2025 年中国教育行业 AI 应用专题分析报告》，2025 年。</li>
+<li><span class="rn">[3]</span> 搜狐科技，&ldquo;猿辅导推出小猿 AI，虚拟老师实现 1 对 1 个性化讲解&rdquo;，2025-04-15。</li>
+<li><span class="rn">[4]</span> 36 氪，&ldquo;作业帮推出 AI 老师一对一学习机&rdquo;。</li>
+<li><span class="rn">[5]</span> 项目源码：<code>src/ai_parenting/templates/instant_help.py</code></li>
+<li><span class="rn">[6]</span> 项目源码：<code>src/ai_parenting/templates/plan_generation.py</code></li>
+<li><span class="rn">[7]</span> 项目源码：<code>src/ai_parenting/templates/weekly_feedback.py</code></li>
+<li><span class="rn">[8]</span> 项目源码：<code>src/ai_parenting/engine/boundary_checker.py</code></li>
+<li><span class="rn">[9]</span> 项目源码：<code>src/ai_parenting/models/enums.py</code></li>
+<li><span class="rn">[10]</span> Lory Seraydarian, &ldquo;AI Parenting: Ethical Dilemmas in Raising Gen Alpha,&rdquo; <em>Plat.AI</em>, 2024-09-06.</li>
+<li><span class="rn">[11]</span> 项目源码：<code>src/ai_parenting/backend/services/ai_session_service.py</code></li>
+<li><span class="rn">[12]</span> 项目源码：<code>src/ai_parenting/templates/degraded.py</code></li>
+<li><span class="rn">[13]</span> UNESCO,《教育和研究领域生成式人工智能使用指南》，2023-09-07。</li>
+<li><span class="rn">[14]</span> 产业调研网,《中国早教市场调研与行业前景预测报告（2025 年版）》。</li>
+<li><span class="rn">[15]</span> Microsoft Education, &ldquo;AI in Education Report,&rdquo; August 2025.</li>
+<li><span class="rn">[16]</span> 搜狐科技，&ldquo;猿辅导推出小猿 AI 学习机&rdquo;，2025-04-15。</li>
+<li><span class="rn">[17]</span> 新浪财经，&ldquo;猿辅导发布小猿 AI 学习机&rdquo;，2025-04-15。</li>
+<li><span class="rn">[18]</span> 搜狐，&ldquo;2025 年 AI 教育前景：技术与应用全面剖析&rdquo;。</li>
+<li><span class="rn">[19]</span> 搜狐，&ldquo;2025 年中国教育行业 AI 应用研究报告&rdquo;。</li>
 </ol>
 </div>
 

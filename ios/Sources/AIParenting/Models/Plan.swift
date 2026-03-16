@@ -20,6 +20,15 @@ public struct DayTaskCompletionUpdate: Codable, Sendable {
     }
 }
 
+/// 追加关注内容到计划请求（「加入本周关注」功能）
+public struct PlanFocusNoteUpdate: Codable, Sendable {
+    public let note: String
+
+    public init(note: String) {
+        self.note = note
+    }
+}
+
 // MARK: - Response Models
 
 /// 日任务响应
@@ -121,6 +130,24 @@ public struct PlanWithFeedbackStatus: Codable, Sendable {
     public init(plan: PlanResponse, weeklyFeedbackStatus: String?) {
         self.plan = plan
         self.weeklyFeedbackStatus = weeklyFeedbackStatus
+    }
+}
+
+/// 计划列表响应（含分页）
+public struct PlanListResponse: Codable, Sendable {
+    public let plans: [PlanResponse]
+    public let hasMore: Bool
+    public let total: Int
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        plans = try container.decodeIfPresent([PlanResponse].self, forKey: .plans) ?? []
+        hasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore) ?? false
+        total = try container.decodeIfPresent(Int.self, forKey: .total) ?? 0
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case plans, hasMore, total
     }
 }
 

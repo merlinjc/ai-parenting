@@ -16,6 +16,8 @@ from ai_parenting.backend.schemas import (
     DayTaskCompletionUpdate,
     DayTaskResponse,
     PlanCreateRequest,
+    PlanFocusNoteUpdate,
+    PlanListResponse,
     PlanResponse,
     PlanWithFeedbackStatus,
 )
@@ -46,6 +48,28 @@ async def get_active_plan(
     return PlanWithFeedbackStatus(
         plan=PlanResponse.model_validate(plan),
         weekly_feedback_status=feedback_status,
+    )
+
+
+@router.get("", response_model=PlanListResponse)
+async def list_plans(
+    child_id: uuid.UUID,
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+) -> PlanListResponse:
+    """获取儿童的历次计划列表（按创建时间降序，含分页）。"""
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=400, detail="limit must be 1-100")
+    if offset < 0:
+        raise HTTPException(status_code=400, detail="offset must be >= 0")
+
+    plans, total = await plan_service.list_plans(db, child_id, limit=limit, offset=offset)
+    plan_responses = [PlanResponse.model_validate(p) for p in plans]
+    return PlanListResponse(
+        plans=plan_responses,
+        has_more=(offset + limit) < total,
+        total=total,
     )
 
 
@@ -108,3 +132,16 @@ async def update_day_completion(
     if task is None:
         raise HTTPException(status_code=404, detail="DayTask not found")
     return DayTaskResponse.model_validate(task)
+
+
+@router.patch("/{plan_id}/focus-note", response_model=PlanResponse)
+async def append_focus_note(
+    plan_id: uuid.UUID,
+    body: PlanFocusNoteUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> PlanResponse:
+    """追加关注内容到计划的 next_week_context（「加入本周关注」功能）。"""
+    plan = await plan_service.append_focus_note(db, plan_id, body.note)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return PlanResponse.model_validate(plan)

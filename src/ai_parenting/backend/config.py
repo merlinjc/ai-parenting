@@ -21,9 +21,15 @@ class Settings(BaseSettings):
 
     # ---------- AI 编排 ----------
     ai_provider: str = "mock"
+    hunyuan_api_key: str = ""
+    hunyuan_base_url: str = "https://api.hunyuan.cloud.tencent.com/v1"
+    hunyuan_model: str = "hunyuan-lite"
 
     # ---------- 推送 ----------
     push_provider: str = "mock"
+
+    # ---------- JWT 认证 ----------
+    jwt_secret_key: str = "ai-parenting-dev-secret-key-change-in-prod"
 
     model_config = {"env_prefix": "AIP_", "env_file": ".env", "extra": "ignore"}
 

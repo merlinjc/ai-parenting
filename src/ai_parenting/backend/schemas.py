@@ -371,6 +371,14 @@ class UnreadCountResponse(BaseModel):
     unread_count: int
 
 
+class PlanListResponse(BaseModel):
+    """计划列表响应（含分页）。"""
+
+    plans: list[PlanResponse]
+    has_more: bool
+    total: int
+
+
 class HomeSummaryResponse(BaseModel):
     """首页聚合响应。"""
 
@@ -419,3 +427,61 @@ class UserProfileUpdate(BaseModel):
                 "caregiver_role 必须为 mother/father/grandparent/other"
             )
         return v
+
+
+# ---------------------------------------------------------------------------
+# Device（设备注册）
+# ---------------------------------------------------------------------------
+
+
+class DeviceRegisterRequest(BaseModel):
+    """设备注册/更新请求。"""
+
+    push_token: str | None = None
+    platform: str = Field(..., description="iOS/Android")
+    app_version: str = Field(..., min_length=1, max_length=20)
+
+    @field_validator("platform")
+    @classmethod
+    def validate_platform(cls, v: str) -> str:
+        if v not in ("iOS", "Android"):
+            raise ValueError("platform 必须为 iOS/Android")
+        return v
+
+
+class DeviceResponse(BaseModel):
+    """设备响应。"""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    push_token: str | None = None
+    platform: str
+    app_version: str
+    last_active_at: UTCDatetime
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Plan Focus Note（加入本周关注）
+# ---------------------------------------------------------------------------
+
+
+class PlanFocusNoteUpdate(BaseModel):
+    """加入本周关注请求（追加关注内容到计划的 next_week_context）。"""
+
+    note: str = Field(..., min_length=1, max_length=2000, description="关注内容摘要")
+
+
+# ---------------------------------------------------------------------------
+# File Upload（文件上传）
+# ---------------------------------------------------------------------------
+
+
+class FileUploadResponse(BaseModel):
+    """文件上传响应。"""
+
+    url: str
+    filename: str
+    size: int

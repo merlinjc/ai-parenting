@@ -2,9 +2,8 @@ import SwiftUI
 
 /// 首页视图
 ///
-/// 展示 child 信息卡、今日任务卡、最近记录、未读角标、周反馈状态提示。
-/// 支持下拉刷新。周反馈横幅绑定 NavigationLink 到 FeedbackView。
-/// 右上角显示 Profile 入口。
+/// 周焦点主卡（阶段+主题+风险+一句话建议）、待处理回流摘要、
+/// 今日任务双栏（主练习+自然嵌入）、周反馈横幅、最近记录。
 public struct HomeView: View {
 
     @Environment(APIClient.self) private var apiClient
@@ -77,22 +76,27 @@ public struct HomeView: View {
         } else {
             ScrollView {
                 VStack(spacing: 16) {
-                    // 儿童信息区
+                    // 周焦点主卡
                     if let child = vm.child {
-                        childInfoCard(child, unreadCount: vm.unreadCount)
+                        weekFocusCard(child: child, plan: vm.activePlan, vm: vm)
                     }
 
-                    // 周反馈提示（修复：绑定 NavigationLink）
+                    // 待处理回流摘要
+                    if vm.hasPendingReturnFlow {
+                        returnFlowSummaryCard(vm)
+                    }
+
+                    // 周反馈提示
                     if vm.hasWeeklyFeedbackReady {
                         weeklyFeedbackBanner(vm)
                     }
 
-                    // 今日任务卡片（点击跳转到计划页查看完整详情）
+                    // 今日任务（双栏拆分）
                     if let task = vm.todayTask {
                         NavigationLink {
                             PlanDetailView(childId: childId)
                         } label: {
-                            todayTaskCard(task)
+                            todayTaskCard(task, plan: vm.activePlan)
                         }
                         .buttonStyle(.plain)
                     }
@@ -110,47 +114,111 @@ public struct HomeView: View {
         }
     }
 
-    // MARK: - Child Info Card
+    // MARK: - Week Focus Card
 
-    private func childInfoCard(_ child: ChildResponse, unreadCount: Int) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(child.nickname)
-                    .font(.title2)
-                    .fontWeight(.bold)
+    private func weekFocusCard(child: ChildResponse, plan: PlanResponse?, vm: HomeViewModel) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 头部：昵称 + 月龄 + 消息角标
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(child.nickname)
+                        .font(.title2)
+                        .fontWeight(.bold)
 
-                HStack(spacing: 8) {
-                    Text("\(child.ageMonths)个月")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundStyle(.blue)
-                        .clipShape(Capsule())
+                    HStack(spacing: 8) {
+                        Text("\(child.ageMonths)个月")
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundStyle(.blue)
+                            .clipShape(Capsule())
 
-                    Text(child.stage)
-                        .font(.caption)
+                        if let stageName = vm.stageDisplayName {
+                            Text(stageName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                // 消息角标
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell.fill")
+                        .font(.title3)
                         .foregroundStyle(.secondary)
+
+                    if vm.unreadCount > 0 {
+                        Text(vm.unreadCount > 99 ? "99+" : "\(vm.unreadCount)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.red)
+                            .clipShape(Capsule())
+                            .offset(x: 8, y: -8)
+                    }
                 }
             }
 
-            Spacer()
+            // 计划信息区（阶段+主题+风险+目标）
+            if let plan = plan {
+                Divider()
 
-            // 消息角标
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "bell.fill")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    // 本周主题
+                    HStack(spacing: 6) {
+                        Image(systemName: "target")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                        Text("本周主题：")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(FocusTheme(rawValue: plan.focusTheme)?.displayName ?? plan.focusTheme)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.blue)
+                    }
 
-                if unreadCount > 0 {
-                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Color.red)
-                        .clipShape(Capsule())
-                        .offset(x: 8, y: -8)
+                    // 一句话目标
+                    Text(plan.primaryGoal)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+
+                    // 风险标签 + 完成率
+                    HStack(spacing: 12) {
+                        if let risk = vm.riskLevel, risk != .normal {
+                            HStack(spacing: 4) {
+                                Image(systemName: risk == .consult ? "exclamationmark.triangle.fill" : "eye.fill")
+                                    .font(.caption2)
+                                Text(risk.displayName)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(risk == .consult ? .red.opacity(0.12) : .orange.opacity(0.12))
+                            )
+                            .foregroundStyle(risk == .consult ? .red : .orange)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.caption2)
+                            Text("完成率 \(Int(plan.completionRate * 100))%")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.secondary)
+
+                        Text("第\(plan.currentDay)/7天")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
         }
@@ -162,7 +230,41 @@ public struct HomeView: View {
         )
     }
 
-    // MARK: - Weekly Feedback Banner (修复：绑定 NavigationLink)
+    // MARK: - Return Flow Summary Card
+
+    private func returnFlowSummaryCard(_ vm: HomeViewModel) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.uturn.backward.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.purple)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("待处理")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(vm.returnFlowSummary)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.purple.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(.purple.opacity(0.15), lineWidth: 1)
+                )
+        )
+    }
+
+    // MARK: - Weekly Feedback Banner
 
     private func weeklyFeedbackBanner(_ vm: HomeViewModel) -> some View {
         NavigationLink {
@@ -198,9 +300,9 @@ public struct HomeView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Today Task Card
+    // MARK: - Today Task Card（双栏拆分）
 
-    private func todayTaskCard(_ task: DayTaskResponse) -> some View {
+    private func todayTaskCard(_ task: DayTaskResponse, plan: PlanResponse?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("今日任务")
@@ -215,17 +317,66 @@ public struct HomeView: View {
                     .clipShape(Capsule())
             }
 
-            Text(task.mainExerciseTitle)
-                .font(.body)
-                .fontWeight(.medium)
+            // 双栏：主练习 + 自然嵌入
+            HStack(alignment: .top, spacing: 12) {
+                // 主练习栏
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("主练习", systemImage: "star.fill")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.orange)
 
-            Text(task.mainExerciseDescription)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
+                    Text(task.mainExerciseTitle)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(2)
+
+                    Text(task.mainExerciseDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.orange.opacity(0.04))
+                )
+
+                // 自然嵌入栏
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("自然嵌入", systemImage: "leaf.fill")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.green)
+
+                    Text(task.naturalEmbedTitle)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(2)
+
+                    Text(task.naturalEmbedDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.green.opacity(0.04))
+                )
+            }
 
             HStack {
                 statusBadge(task.completionStatus)
+
+                if task.completionStatus == "executed", let plan = plan {
+                    Text("已同步到计划页")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+
                 Spacer()
                 Image(systemName: "chevron.right")
                     .foregroundStyle(.secondary)
@@ -264,9 +415,9 @@ public struct HomeView: View {
     private func recordCard(_ record: RecordResponse) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: record.type == "quick_check" ? "checkmark.circle" : "note.text")
+                Image(systemName: record.type == "quick_check" ? "checkmark.circle" : record.type == "voice" ? "mic.fill" : "note.text")
                     .foregroundStyle(.blue)
-                Text(record.type == "quick_check" ? "快检" : "事件")
+                Text(RecordType(rawValue: record.type)?.displayName ?? record.type)
                     .font(.caption)
                     .fontWeight(.medium)
             }
@@ -278,9 +429,17 @@ public struct HomeView: View {
                     .lineLimit(2)
             }
 
-            Text(record.createdAt, style: .relative)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            HStack(spacing: 4) {
+                Text(record.createdAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+
+                if record.syncedToPlan {
+                    Image(systemName: "link")
+                        .font(.caption2)
+                        .foregroundStyle(.blue.opacity(0.6))
+                }
+            }
         }
         .frame(width: 140)
         .padding(12)

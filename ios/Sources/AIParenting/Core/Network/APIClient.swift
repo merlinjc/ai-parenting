@@ -9,6 +9,7 @@ import Observation
 public protocol APIClientProtocol: Sendable {
     func request<T: Decodable & Sendable>(_ endpoint: Endpoint) async throws -> T
     func requestVoid(_ endpoint: Endpoint) async throws
+    func uploadFile(data: Data, filename: String, mimeType: String) async throws -> FileUploadResponse
 }
 
 /// 泛型网络客户端
@@ -123,6 +124,66 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
 
     public func requestVoid(_ endpoint: Endpoint) async throws {
         _ = try await performRequest(endpoint)
+    }
+
+    /// multipart/form-data 文件上传
+    public func uploadFile(data: Data, filename: String, mimeType: String) async throws -> FileUploadResponse {
+        let endpoint = Endpoint.uploadFile
+        var components = URLComponents()
+        components.scheme = config.baseURL.scheme
+        components.host = config.baseURL.host
+        components.port = config.baseURL.port
+        components.path = endpoint.path
+
+        guard let url = components.url else {
+            throw APIError.unknown
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        // 注入认证 Header
+        for (key, value) in authProvider.authHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        // 构建 multipart/form-data body
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(data)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let responseData: Data
+        let response: URLResponse
+        do {
+            (responseData, response) = try await session.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            throw APIError.timeout
+        } catch {
+            throw APIError.networkError(underlying: error)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.unknown
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let message = String(data: responseData, encoding: .utf8)
+            throw APIError.fromHTTPStatus(httpResponse.statusCode, message: message)
+        }
+
+        do {
+            return try decoder.decode(FileUploadResponse.self, from: responseData)
+        } catch {
+            throw APIError.decodingError(underlying: error)
+        }
     }
 
     // MARK: - Private

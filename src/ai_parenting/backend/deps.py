@@ -10,13 +10,28 @@ from functools import lru_cache
 from ai_parenting.backend.config import settings
 from ai_parenting.backend.services.push_service import MockPushProvider, PushProvider
 from ai_parenting.orchestrator import Orchestrator
+from ai_parenting.providers.base import ModelProvider
 from ai_parenting.providers.mock_provider import MockProvider
+
+
+def _create_provider() -> ModelProvider:
+    """根据配置创建对应的 AI 模型供应商。"""
+    if settings.ai_provider == "hunyuan":
+        from ai_parenting.providers.hunyuan_provider import HunyuanProvider
+
+        return HunyuanProvider(
+            api_key=settings.hunyuan_api_key,
+            base_url=settings.hunyuan_base_url,
+            model=settings.hunyuan_model,
+        )
+    # 默认使用 MockProvider
+    return MockProvider()
 
 
 @lru_cache(maxsize=1)
 def _create_orchestrator() -> Orchestrator:
-    """创建 Orchestrator 单例（使用 MockProvider）。"""
-    provider = MockProvider()
+    """创建 Orchestrator 单例（根据配置选择 AI Provider）。"""
+    provider = _create_provider()
     return Orchestrator(provider=provider)
 
 
