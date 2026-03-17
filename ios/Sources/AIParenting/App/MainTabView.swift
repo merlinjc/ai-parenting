@@ -11,6 +11,10 @@ public struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var showInstantHelp = false
     @State private var showRecordCreate = false
+    @State private var showVoiceOverlay = false
+
+    // 浮动按钮菜单
+    @State private var showFABMenu = false
 
     // 跨 Tab 导航携带的参数
     @State private var recordSourcePlanId: UUID?
@@ -53,27 +57,89 @@ public struct MainTabView: View {
                         .tabItem {
                             Label("消息", systemImage: "bell.fill")
                         }
+                        .badge(appState.unreadMessageCount)
                         .tag(3)
                 }
 
-                // 即时求助浮动按钮（所有 Tab 可见）
-                Button {
-                    instantHelpPlanId = nil
-                    showInstantHelp = true
-                } label: {
-                    Image(systemName: "questionmark.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.white)
-                        .frame(width: 56, height: 56)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.appPrimary, Color.appSecondary],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                // 浮动操作按钮（点击即时求助 / 长按展开菜单）
+                VStack(spacing: 10) {
+                    // 展开的菜单项（从下到上动画展开）
+                    if showFABMenu {
+                        VStack(spacing: 8) {
+                            fabMenuItem(
+                                icon: "mic.circle.fill",
+                                label: "语音求助",
+                                gradient: [.purple, .pink]
+                            ) {
+                                showFABMenu = false
+                                showVoiceOverlay = true
+                            }
+
+                            fabMenuItem(
+                                icon: "waveform.circle.fill",
+                                label: "语音记录",
+                                gradient: [.green, .mint]
+                            ) {
+                                showFABMenu = false
+                                recordSourcePlanId = nil
+                                recordSourceSessionId = nil
+                                recordPrefillTheme = nil
+                                showRecordCreate = true
+                            }
+
+                            fabMenuItem(
+                                icon: "text.bubble.fill",
+                                label: "文字求助",
+                                gradient: [Color.appPrimary, Color.appSecondary]
+                            ) {
+                                showFABMenu = false
+                                instantHelpPlanId = nil
+                                showInstantHelp = true
+                            }
+                        }
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.5, anchor: .bottom).combined(with: .opacity),
+                            removal: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity)
+                        ))
+                    }
+
+                    // 主浮动按钮
+                    Button {
+                        if showFABMenu {
+                            // 菜单已展开时，点击关闭菜单
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                showFABMenu = false
+                            }
+                        } else {
+                            // 菜单未展开时，直接打开即时求助
+                            instantHelpPlanId = nil
+                            showInstantHelp = true
+                        }
+                    } label: {
+                        Image(systemName: showFABMenu ? "xmark" : "questionmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                LinearGradient(
+                                    colors: showFABMenu ? [.gray, .gray.opacity(0.8)] : [Color.appPrimary, Color.appSecondary],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .clipShape(Circle())
-                        .shadow(color: Color.appPrimary.opacity(0.4), radius: 8, y: 4)
+                            .clipShape(Circle())
+                            .shadow(color: Color.appPrimary.opacity(0.4), radius: 8, y: 4)
+                    }
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.4)
+                            .onEnded { _ in
+                                if !showFABMenu {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                        showFABMenu = true
+                                    }
+                                }
+                            }
+                    )
                 }
                 .padding(.trailing, 20)
                 .padding(.bottom, 80)
@@ -85,7 +151,8 @@ public struct MainTabView: View {
                     onRecordFromResult: { sessionId in
                         showInstantHelp = false
                         // 延迟到 sheet dismiss 完成后再打开记录
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 300_000_000)
                             recordSourceSessionId = sessionId
                             recordSourcePlanId = nil
                             appState.navigate(to: .recordCreate(sourcePlanId: nil, sourceSessionId: sessionId, theme: nil))
@@ -113,6 +180,11 @@ public struct MainTabView: View {
                     sourceSessionId: recordSourceSessionId,
                     prefillTheme: recordPrefillTheme
                 )
+            }
+            .sheet(isPresented: $showVoiceOverlay) {
+                VoiceOverlayView(childId: childId)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
             }
             .onChange(of: appState.pendingNavigation) { _, newValue in
                 guard let target = newValue else { return }
@@ -146,6 +218,37 @@ public struct MainTabView: View {
         }
     }
 
+    // MARK: - FAB Menu Item
+
+    private func fabMenuItem(icon: String, label: String, gradient: [Color], action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Text(label)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                    )
+
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    .clipShape(Circle())
+                    .shadow(color: gradient.first?.opacity(0.3) ?? .clear, radius: 4, y: 2)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Deep Link Handler
 
     private func handleDeepLink(_ target: DeepLinkTarget, childId: UUID) {
@@ -159,12 +262,16 @@ public struct MainTabView: View {
             recordPrefillTheme = theme
             selectedTab = 2
             // 短暂延迟确保 Tab 切换完成后弹出 sheet
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 200_000_000)
                 showRecordCreate = true
             }
 
         case .recordList:
             selectedTab = 2
+
+        case .messageList:
+            selectedTab = 3
 
         case .weeklyFeedback:
             // 切到计划 Tab（周反馈从计划页入口进入）
@@ -210,7 +317,8 @@ public struct MainTabView: View {
     private func showToastMessage(_ message: String) {
         toastMessage = message
         showToast = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
             showToast = false
         }
     }

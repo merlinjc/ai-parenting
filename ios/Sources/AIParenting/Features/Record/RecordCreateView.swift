@@ -26,6 +26,7 @@ public struct RecordCreateView: View {
     @State private var scene = ""
     @State private var timeOfDay = ""
     @State private var selectedCandidates: Set<String> = []
+    @State private var showSaveSuccess = false
 
     private let tagOptions = ["语言", "社交", "情绪", "运动", "认知", "自理", "进步", "困难"]
     private let sceneOptions = ["家中", "户外", "学校", "游乐场", "其他"]
@@ -159,13 +160,25 @@ public struct RecordCreateView: View {
                             .font(.subheadline)
                             .fontWeight(.semibold)
 
-                        TextEditor(text: $content)
-                            .frame(minHeight: 120)
-                            .padding(8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                            )
+                        ZStack(alignment: .topLeading) {
+                            TextEditor(text: $content)
+                                .frame(minHeight: 120)
+                                .padding(8)
+                                .scrollDismissesKeyboard(.interactively)
+
+                            if content.isEmpty {
+                                Text("描述一下观察到的情况...")
+                                    .font(.body)
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.horizontal, 13)
+                                    .padding(.vertical, 16)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                     }
 
                     // 标签选择
@@ -258,6 +271,23 @@ public struct RecordCreateView: View {
                     .disabled(content.isEmpty || viewModel.isCreating)
                 }
             }
+            .overlay {
+                if showSaveSuccess {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.green)
+                        Text("保存成功")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(32)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.3), value: showSaveSuccess)
         }
     }
 
@@ -277,6 +307,12 @@ public struct RecordCreateView: View {
         )
         let success = await viewModel.createRecord(create)
         if success {
+            // 触觉反馈
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            // 短暂显示成功提示后关闭
+            showSaveSuccess = true
+            try? await Task.sleep(nanoseconds: 600_000_000) // 0.6s
             onDismiss()
         }
     }
@@ -298,6 +334,10 @@ public struct RecordCreateView: View {
         )
         let success = await viewModel.createRecord(create)
         if success {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            showSaveSuccess = true
+            try? await Task.sleep(nanoseconds: 600_000_000)
             onDismiss()
         }
     }

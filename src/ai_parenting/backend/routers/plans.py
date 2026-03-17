@@ -10,6 +10,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_parenting.backend.auth import get_current_user_id
 from ai_parenting.backend.database import get_db
 from ai_parenting.backend.deps import get_orchestrator
 from ai_parenting.backend.schemas import (
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/plans", tags=["plans"])
 @router.get("/active", response_model=PlanWithFeedbackStatus)
 async def get_active_plan(
     child_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> PlanWithFeedbackStatus:
     """获取儿童当前活跃计划（含 7 个日任务和周反馈状态）。"""
@@ -56,6 +58,7 @@ async def list_plans(
     child_id: uuid.UUID,
     limit: int = 20,
     offset: int = 0,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> PlanListResponse:
     """获取儿童的历次计划列表（按创建时间降序，含分页）。"""
@@ -138,6 +141,7 @@ async def update_day_completion(
 async def append_focus_note(
     plan_id: uuid.UUID,
     body: PlanFocusNoteUpdate,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> PlanResponse:
     """追加关注内容到计划的 next_week_context（「加入本周关注」功能）。"""

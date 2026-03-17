@@ -18,11 +18,21 @@ from ai_parenting.models.enums import ChildStage
 
 def _compute_age_months(birth_year_month: str) -> int:
     """根据出生年月计算当前月龄。"""
-    today = date.today()
-    parts = birth_year_month.split("-")
-    birth_year, birth_month = int(parts[0]), int(parts[1])
-    months = (today.year - birth_year) * 12 + (today.month - birth_month)
-    return max(18, min(48, months))
+    # P2-5: 格式校验
+    try:
+        today = date.today()
+        parts = birth_year_month.split("-")
+        if len(parts) != 2:
+            raise ValueError("Invalid format")
+        birth_year, birth_month = int(parts[0]), int(parts[1])
+        if not (1900 <= birth_year <= today.year) or not (1 <= birth_month <= 12):
+            raise ValueError("Invalid year/month range")
+        months = (today.year - birth_year) * 12 + (today.month - birth_month)
+        return max(18, min(48, months))
+    except (ValueError, IndexError) as exc:
+        raise ValueError(
+            f"Invalid birth_year_month format: '{birth_year_month}'. Expected YYYY-MM"
+        ) from exc
 
 
 def _compute_stage(age_months: int) -> str:

@@ -1,11 +1,18 @@
 """统一编排调度器。
 
+Phase 3 升级：
+- 注入 SkillRegistry，通过 Skill 接口动态路由（替代硬编码的 if session_type == 分支）
+- 保留向后兼容：无 SkillRegistry 时降级为直接导入 Renderer（Legacy 模式）
+- Skill.supports_orchestrate=True 的技能由 Orchestrator 驱动：
+    render_prompt → 调用模型 → parse_result → check_boundary
+- 新增技能只需实现 Skill 接口并注册到 SkillRegistry，无需修改此文件
+
 实现 AI 编排层的核心调度逻辑：
-1. 根据 session_type 选择渲染器，渲染 Prompt
-2. 调用 ModelProvider.generate()，含超时控制
-3. 解析 JSON → 对应 Result 模型
-4. 字段约束校验（Pydantic 自动完成）
-5. 边界检查（BoundaryChecker）
+1. 根据 session_type 从 SkillRegistry 获取 Skill
+2. 调用 Skill.render_prompt() 渲染 Prompt
+3. 调用 ModelProvider.generate()，含超时控制
+4. 调用 Skill.parse_result() 解析 JSON → Result 模型
+5. 调用 Skill.check_boundary() 安全边界检查
 6. 异常处理：超时 → 降级；解析失败 → 重试1次 → 降级；边界不通过 → 替换后返回
 7. 构建 OutputMetadata，返回 OrchestrateResult
 """
@@ -13,10 +20,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, ValidationError
 
@@ -31,7 +39,16 @@ from ai_parenting.models.schemas import (
 )
 from ai_parenting.providers.base import ModelProvider
 
-# 渲染器导入
+if TYPE_CHECKING:
+    from ai_parenting.skills.base import Skill
+    from ai_parenting.skills.registry import SkillRegistry
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Legacy 渲染器导入（向后兼容，无 SkillRegistry 时降级使用）
+# ---------------------------------------------------------------------------
+
 from ai_parenting.renderer import (
     check_boundary as check_instant_help_boundary,
     get_degraded_result as get_degraded_instant_help,
@@ -54,9 +71,8 @@ from ai_parenting.renderer_weekly_feedback import (
     render_weekly_feedback_prompt,
 )
 
-
 # ---------------------------------------------------------------------------
-# 超时配置
+# Legacy 超时配置（无 SkillRegistry 时使用）
 # ---------------------------------------------------------------------------
 
 _TIMEOUT_CONFIG: dict[SessionType, float] = {
@@ -93,26 +109,45 @@ class OrchestrateResult:
 class Orchestrator:
     """统一编排调度器。
 
-    统一处理三种 session_type 的 AI 调用流程：
-    渲染 Prompt → 调用模型 → 解析 → 校验 → 边界检查 → 降级兜底。
+    Phase 3 升级：
+    - 支持两种模式：SkillRegistry 模式（推荐）和 Legacy 模式（向后兼容）
+    - SkillRegistry 模式下，所有路由逻辑由 SkillRegistry 和 Skill 接口驱动
+    - 新增技能无需修改此文件，只需注册到 SkillRegistry
 
     Args:
         provider: 模型供应商实现。
+        skill_registry: 技能注册表（可选，为 None 时降级为 Legacy 模式）。
 
     用法::
 
+        # Phase 3: SkillRegistry 模式（推荐）
+        registry = SkillRegistry()
+        registry.discover_and_register(adapters_path)
+        orchestrator = Orchestrator(provider, skill_registry=registry)
+
+        # Legacy: 直接调用（向后兼容）
         orchestrator = Orchestrator(provider)
+
         result = await orchestrator.orchestrate(
             session_type=SessionType.INSTANT_HELP,
             context=context_snapshot,
             user_scenario="吃饭不坐",
-            user_input_text="孩子一直站着吃饭",
         )
     """
 
-    def __init__(self, provider: ModelProvider) -> None:
+    def __init__(
+        self,
+        provider: ModelProvider,
+        skill_registry: "SkillRegistry | None" = None,
+    ) -> None:
         self._provider = provider
+        self._skill_registry = skill_registry
         self._boundary_checker = BoundaryChecker()
+
+    @property
+    def skill_registry(self) -> "SkillRegistry | None":
+        """获取注入的 SkillRegistry（供外部查询使用）。"""
+        return self._skill_registry
 
     async def orchestrate(
         self,
@@ -125,24 +160,53 @@ class Orchestrator:
         Args:
             session_type: AI 会话类型。
             context: 儿童上下文快照。
-            **kwargs: 各 session_type 专属参数：
-                - instant_help: user_scenario, user_input_text, child_nickname,
-                                active_plan_title, recent_records_summary
-                - plan_generation: child_nickname, recent_records_summary
-                - weekly_feedback: child_nickname, active_plan_title,
-                                   active_plan_focus_theme, plan_completion_rate,
-                                   record_count_this_week, day_tasks_summary,
-                                   weekly_records_detail, active_plan_id
+            **kwargs: 各 session_type 专属参数。
 
         Returns:
             OrchestrateResult，包含 result、metadata 和 status。
         """
+        # Phase 3: 优先通过 SkillRegistry 路由
+        skill = self._resolve_skill(session_type)
+        if skill is not None and skill.supports_orchestrate:
+            return await self._orchestrate_via_skill(skill, context, **kwargs)
+
+        # Legacy 降级：直接调用渲染器
+        logger.debug(
+            "Orchestrator falling back to legacy mode for session_type=%s",
+            session_type.value,
+        )
+        return await self._orchestrate_legacy(session_type, context, **kwargs)
+
+    def _resolve_skill(self, session_type: SessionType) -> "Skill | None":
+        """从 SkillRegistry 按 session_type 查找对应的 Skill。"""
+        if self._skill_registry is None:
+            return None
+
+        # 方式 1: 按 session_type.value 精确匹配 skill.metadata.session_type
+        for skill in self._skill_registry.get_enabled_skills():
+            if skill.metadata.session_type == session_type.value:
+                return skill
+
+        # 方式 2: 按名称匹配（session_type.value 与 skill name 相同）
+        return self._skill_registry.get(session_type.value)
+
+    # ==================================================================
+    # Phase 3: SkillRegistry 模式
+    # ==================================================================
+
+    async def _orchestrate_via_skill(
+        self,
+        skill: "Skill",
+        context: ContextSnapshot,
+        **kwargs: Any,
+    ) -> OrchestrateResult:
+        """通过 Skill 接口驱动完整的编排流程。"""
         start_time = time.monotonic()
-        timeout = _TIMEOUT_CONFIG[session_type]
-        template_version = self._get_template_version(session_type)
+        initial_timeout, final_timeout = skill.get_timeout_config()
+        template_version = skill.get_template_version()
 
         # Step 1: 渲染 Prompt
-        prompt = self._render_prompt(session_type, context, **kwargs)
+        prompt = skill.render_prompt(context, **kwargs)
 
         # Step 2-6: 调用模型 + 解析 + 校验 + 边界检查（含重试和降级）
         result: BaseModel | None = None
@@ -151,6 +215,7 @@ class Orchestrator:
         boundary_flags: list[str] = []
         is_degraded = False
 
+        timeout = initial_timeout
         for attempt in range(2):  # 最多 2 次（首次 + 1 次重试）
             try:
                 # 调用模型
@@ -160,52 +225,143 @@ class Orchestrator:
                 )
 
                 # 解析 + Pydantic 校验
-                parsed = self._parse_result(session_type, raw_response)
+                parsed = skill.parse_result(raw_response)
 
                 # 边界检查
-                check_output = self._check_boundary(session_type, parsed)
+                check_output = skill.check_boundary(parsed)
                 if check_output.passed:
                     result = parsed
                     boundary_passed = True
                 else:
-                    # 边界不通过 → 使用清洁后的结果
                     boundary_passed = False
                     boundary_flags = [f.category for f in check_output.flags]
                     result = check_output.cleaned_result if check_output.cleaned_result else parsed
 
-                break  # 成功，跳出重试循环
+                break  # 成功
 
             except asyncio.TimeoutError:
                 if attempt == 0:
-                    # 首次超时，使用更长的最终超时重试
-                    timeout = _FINAL_TIMEOUT_CONFIG[session_type] - timeout
+                    timeout = final_timeout - initial_timeout
                     if timeout <= 0:
-                        # 无法重试，直接降级
-                        result = self._get_degraded_result(session_type)
+                        result = skill.get_degraded_result()
                         status = SessionStatus.DEGRADED
                         is_degraded = True
                         break
                     continue
                 else:
-                    # 重试后仍超时，降级
-                    result = self._get_degraded_result(session_type)
+                    result = skill.get_degraded_result()
+                    status = SessionStatus.DEGRADED
+                    is_degraded = True
+                    break
+
+            except (ValidationError, ValueError, Exception) as e:
+                logger.warning(
+                    "Skill '%s' orchestrate attempt %d failed: %s",
+                    skill.metadata.name, attempt + 1, e,
+                )
+                if attempt == 0:
+                    continue
+                else:
+                    result = skill.get_degraded_result()
+                    status = SessionStatus.DEGRADED
+                    is_degraded = True
+                    break
+
+        # 最终兜底
+        if result is None:
+            result = skill.get_degraded_result()
+            status = SessionStatus.DEGRADED
+            is_degraded = True
+
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+
+        metadata = OutputMetadata(
+            prompt_template_version=template_version,
+            model_provider=self._provider.provider_name,
+            model_version=self._provider.model_version,
+            boundary_check_passed=boundary_passed,
+            boundary_check_flags=boundary_flags,
+            generation_timestamp=datetime.now(timezone.utc),
+            latency_ms=elapsed_ms,
+        )
+
+        logger.info(
+            "Orchestrate via skill '%s': status=%s, latency=%dms, degraded=%s",
+            skill.metadata.name, status.value, elapsed_ms, is_degraded,
+        )
+
+        return OrchestrateResult(
+            result=result,
+            metadata=metadata,
+            status=status,
+        )
+
+    # ==================================================================
+    # Legacy 模式（向后兼容，无 SkillRegistry 时使用）
+    # ==================================================================
+
+    async def _orchestrate_legacy(
+        self,
+        session_type: SessionType,
+        context: ContextSnapshot,
+        **kwargs: Any,
+    ) -> OrchestrateResult:
+        """Legacy 模式：直接调用渲染器函数。"""
+        start_time = time.monotonic()
+        timeout = _TIMEOUT_CONFIG[session_type]
+        template_version = self._get_template_version_legacy(session_type)
+
+        prompt = self._render_prompt_legacy(session_type, context, **kwargs)
+
+        result: BaseModel | None = None
+        status = SessionStatus.COMPLETED
+        boundary_passed = True
+        boundary_flags: list[str] = []
+        is_degraded = False
+
+        for attempt in range(2):
+            try:
+                raw_response = await asyncio.wait_for(
+                    self._provider.generate(prompt, timeout),
+                    timeout=timeout,
+                )
+                parsed = self._parse_result_legacy(session_type, raw_response)
+                check_output = self._check_boundary_legacy(session_type, parsed)
+                if check_output.passed:
+                    result = parsed
+                    boundary_passed = True
+                else:
+                    boundary_passed = False
+                    boundary_flags = [f.category for f in check_output.flags]
+                    result = check_output.cleaned_result if check_output.cleaned_result else parsed
+                break
+
+            except asyncio.TimeoutError:
+                if attempt == 0:
+                    timeout = _FINAL_TIMEOUT_CONFIG[session_type] - timeout
+                    if timeout <= 0:
+                        result = self._get_degraded_result_legacy(session_type)
+                        status = SessionStatus.DEGRADED
+                        is_degraded = True
+                        break
+                    continue
+                else:
+                    result = self._get_degraded_result_legacy(session_type)
                     status = SessionStatus.DEGRADED
                     is_degraded = True
                     break
 
             except (ValidationError, ValueError, Exception) as e:
                 if attempt == 0:
-                    continue  # 首次失败，重试
+                    continue
                 else:
-                    # 重试后仍失败，降级
-                    result = self._get_degraded_result(session_type)
+                    result = self._get_degraded_result_legacy(session_type)
                     status = SessionStatus.DEGRADED
                     is_degraded = True
                     break
 
-        # 最终兜底（理论上不应该到达这里）
         if result is None:
-            result = self._get_degraded_result(session_type)
+            result = self._get_degraded_result_legacy(session_type)
             status = SessionStatus.DEGRADED
             is_degraded = True
 
@@ -228,16 +384,12 @@ class Orchestrator:
         )
 
     # ------------------------------------------------------------------
-    # 内部方法：渲染 Prompt
+    # Legacy 内部方法
     # ------------------------------------------------------------------
 
-    def _render_prompt(
-        self,
-        session_type: SessionType,
-        context: ContextSnapshot,
-        **kwargs: Any,
+    def _render_prompt_legacy(
+        self, session_type: SessionType, context: ContextSnapshot, **kwargs: Any,
     ) -> str:
-        """根据 session_type 选择渲染器并渲染 Prompt。"""
         if session_type == SessionType.INSTANT_HELP:
             return render_instant_help_prompt(
                 context=context,
@@ -268,16 +420,7 @@ class Orchestrator:
         else:
             raise ValueError(f"不支持的 session_type: {session_type}")
 
-    # ------------------------------------------------------------------
-    # 内部方法：解析 Result
-    # ------------------------------------------------------------------
-
-    def _parse_result(
-        self,
-        session_type: SessionType,
-        raw_json: str,
-    ) -> BaseModel:
-        """根据 session_type 解析 JSON 为对应的 Result 类型。"""
+    def _parse_result_legacy(self, session_type: SessionType, raw_json: str) -> BaseModel:
         if session_type == SessionType.INSTANT_HELP:
             return parse_instant_help_result(raw_json)
         elif session_type == SessionType.PLAN_GENERATION:
@@ -287,16 +430,7 @@ class Orchestrator:
         else:
             raise ValueError(f"不支持的 session_type: {session_type}")
 
-    # ------------------------------------------------------------------
-    # 内部方法：边界检查
-    # ------------------------------------------------------------------
-
-    def _check_boundary(
-        self,
-        session_type: SessionType,
-        result: BaseModel,
-    ) -> BoundaryCheckOutput:
-        """根据 session_type 执行边界检查。"""
+    def _check_boundary_legacy(self, session_type: SessionType, result: BaseModel) -> BoundaryCheckOutput:
         if session_type == SessionType.INSTANT_HELP:
             return check_instant_help_boundary(result)  # type: ignore
         elif session_type == SessionType.PLAN_GENERATION:
@@ -306,12 +440,7 @@ class Orchestrator:
         else:
             raise ValueError(f"不支持的 session_type: {session_type}")
 
-    # ------------------------------------------------------------------
-    # 内部方法：获取降级结果
-    # ------------------------------------------------------------------
-
-    def _get_degraded_result(self, session_type: SessionType) -> BaseModel:
-        """根据 session_type 获取降级结果。"""
+    def _get_degraded_result_legacy(self, session_type: SessionType) -> BaseModel:
         if session_type == SessionType.INSTANT_HELP:
             return get_degraded_instant_help()
         elif session_type == SessionType.PLAN_GENERATION:
@@ -321,12 +450,7 @@ class Orchestrator:
         else:
             raise ValueError(f"不支持的 session_type: {session_type}")
 
-    # ------------------------------------------------------------------
-    # 内部方法：获取模板版本
-    # ------------------------------------------------------------------
-
-    def _get_template_version(self, session_type: SessionType) -> str:
-        """根据 session_type 获取模板版本。"""
+    def _get_template_version_legacy(self, session_type: SessionType) -> str:
         if session_type == SessionType.INSTANT_HELP:
             return get_instant_help_version()
         elif session_type == SessionType.PLAN_GENERATION:

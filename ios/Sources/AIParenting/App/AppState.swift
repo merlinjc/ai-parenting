@@ -14,6 +14,8 @@ public enum DeepLinkTarget: Equatable {
     case recordCreate(sourcePlanId: UUID?, sourceSessionId: UUID?, theme: String?)
     /// 跳转到记录列表
     case recordList
+    /// 跳转到消息列表
+    case messageList
     /// 跳转到周反馈详情
     case weeklyFeedback(feedbackId: UUID)
     /// 跳转到即时求助（携带 planId 上下文）
@@ -22,9 +24,21 @@ public enum DeepLinkTarget: Equatable {
 
 /// 全局应用状态管理
 ///
-/// 管理当前活跃的儿童档案、用户信息、引导流程状态和跨 Tab 深链导航。
+/// 管理当前活跃的儿童档案、用户信息、认证状态、引导流程和跨 Tab 深链导航。
 @Observable
 public final class AppState {
+
+    // MARK: - Auth State
+
+    /// JWT 认证提供者（暴露给 LoginView 和 ProfileView 使用）
+    public let jwtAuthProvider: JWTAuthProvider
+
+    /// 是否已完成登录认证
+    ///
+    /// 使用独立的 stored property 而非委托给 JWTAuthProvider.isAuthenticated，
+    /// 因为 JWTAuthProvider 不是 @Observable，其内部状态变更不会触发 SwiftUI 刷新。
+    /// 在 handleLoginSuccess() / logout() / init 中手动同步。
+    public var isAuthenticated: Bool = false
 
     // MARK: - State
 
@@ -54,6 +68,9 @@ public final class AppState {
     /// 错误
     public var error: APIError?
 
+    /// 未读消息数（供 Tab 角标显示）
+    public var unreadMessageCount: Int = 0
+
     // MARK: - Deep Link Navigation
 
     /// 待处理的跨 Tab 导航目标。设置后由 MainTabView 监听并执行导航。
@@ -71,6 +88,36 @@ public final class AppState {
         pendingNavigation = nil
     }
 
+    // MARK: - Auth Actions
+
+    /// 登录成功后的处理：更新认证状态并触发重新初始化
+    @MainActor
+    public func handleLoginSuccess() {
+        isAuthenticated = true
+        isInitialized = false
+        error = nil
+        children = []
+        activeChildId = nil
+        activeChild = nil
+        userProfile = nil
+    }
+
+    /// 登出：清除认证凭证和所有用户数据
+    @MainActor
+    public func logout() {
+        jwtAuthProvider.clearCredentials()
+        isAuthenticated = false
+        isInitialized = false
+        error = nil
+        children = []
+        activeChildId = nil
+        activeChild = nil
+        userProfile = nil
+        pendingNavigation = nil
+        // 清除持久化的活跃儿童 ID
+        UserDefaults.standard.removeObject(forKey: Self.childIdKey)
+    }
+
     // MARK: - Child State Refresh
 
     /// 刷新当前活跃儿童数据（当收到 risk_alert 等消息时调用）
@@ -84,7 +131,8 @@ public final class AppState {
                 children[index] = child
             }
         } catch {
-            // 静默失败
+            // 刷新活跃儿童数据失败，记录日志但不中断流程
+            print("[AppState] refreshActiveChild failed: \(error.localizedDescription)")
         }
     }
 
@@ -96,10 +144,15 @@ public final class AppState {
     public var apiClientRef: APIClientProtocol { apiClient }
 
     /// 推送通知管理器
-    public let pushManager = PushNotificationManager()
+    public let pushManager: PushNotificationManager
 
-    public init(apiClient: APIClientProtocol) {
+    @MainActor
+    public init(apiClient: APIClientProtocol, authProvider: JWTAuthProvider = JWTAuthProvider()) {
+        self.pushManager = PushNotificationManager()
         self.apiClient = apiClient
+        self.jwtAuthProvider = authProvider
+        // 从 Keychain 恢复的 token 同步到 stored property
+        self.isAuthenticated = authProvider.isAuthenticated
     }
 
     // MARK: - Actions
@@ -127,12 +180,21 @@ public final class AppState {
 
             isInitialized = true
         } catch let apiError as APIError {
-            error = apiError
-            // 即使加载失败也标记已初始化，避免卡在加载状态
-            isInitialized = true
+            // 如果是 401 未授权，说明 token 过期，退回登录页
+            if case .unauthorized = apiError {
+                jwtAuthProvider.clearCredentials()
+                isAuthenticated = false
+                isInitialized = true // 不可重试，需要重新登录
+            } else if case .networkError = apiError {
+                // 网络错误可重试，不标记 isInitialized 以允许用户刷新
+                error = apiError
+            } else {
+                error = apiError
+                isInitialized = true
+            }
         } catch {
+            // 网络错误可重试
             self.error = .networkError(underlying: error)
-            isInitialized = true
         }
 
         isLoading = false
@@ -176,6 +238,8 @@ public final class AppState {
             return nil
         case "record_list":
             return .recordList
+        case "message_list":
+            return .messageList
         case "weekly_feedback":
             if let feedbackIdStr = params["feedback_id"], let feedbackId = UUID(uuidString: feedbackIdStr) {
                 return .weeklyFeedback(feedbackId: feedbackId)
@@ -228,7 +292,7 @@ public final class AppState {
                 activeChild = childrenList.first(where: { $0.id == id })
             }
         } catch {
-            // 静默失败，保持现有数据
+            print("[AppState] refreshChildren failed: \(error.localizedDescription)")
         }
     }
 
@@ -240,7 +304,7 @@ public final class AppState {
             userProfile = profile
             children = profile.children
         } catch {
-            // 静默失败
+            print("[AppState] refreshProfile failed: \(error.localizedDescription)")
         }
     }
 

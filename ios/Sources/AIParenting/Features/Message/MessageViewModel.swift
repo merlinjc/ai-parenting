@@ -15,6 +15,7 @@ public final class MessageViewModel {
     public var hasMore = false
     public var totalUnread = 0
     public var isLoading = false
+    public var isLoadingMore = false
     public var error: APIError?
 
     // MARK: - Dependencies
@@ -50,10 +51,10 @@ public final class MessageViewModel {
 
     @MainActor
     public func loadMore() async {
-        guard hasMore, !isLoading else { return }
+        guard hasMore, !isLoading, !isLoadingMore else { return }
         guard let lastMessage = messages.last else { return }
 
-        isLoading = true
+        isLoadingMore = true
         do {
             let result: MessageListResponse = try await apiClient.request(
                 .listMessages(limit: pageSize, before: lastMessage.createdAt)
@@ -66,11 +67,25 @@ public final class MessageViewModel {
         } catch {
             self.error = .networkError(underlying: error)
         }
-        isLoading = false
+        isLoadingMore = false
     }
 
     @MainActor
     public func markAsRead(_ messageId: UUID) async {
+        // 乐观更新：同时更新计数和消息状态
+        let previousUnread = totalUnread
+        totalUnread = max(0, totalUnread - 1)
+
+        // 乐观更新消息的 readStatus（避免 UI 闪烁）
+        var previousMessage: MessageResponse?
+        if let index = messages.firstIndex(where: { $0.id == messageId }) {
+            previousMessage = messages[index]
+            // 创建已读副本用于乐观更新（MessageResponse 是 struct）
+            var updated = messages[index]
+            updated.readStatus = "read"
+            messages[index] = updated
+        }
+
         let update = MessageUpdateRequest(readStatus: "read")
         do {
             let updated: MessageResponse = try await apiClient.request(
@@ -79,9 +94,12 @@ public final class MessageViewModel {
             if let index = messages.firstIndex(where: { $0.id == messageId }) {
                 messages[index] = updated
             }
-            totalUnread = max(0, totalUnread - 1)
         } catch {
-            // 静默处理
+            // 回滚乐观更新
+            totalUnread = previousUnread
+            if let prev = previousMessage, let index = messages.firstIndex(where: { $0.id == messageId }) {
+                messages[index] = prev
+            }
         }
     }
 

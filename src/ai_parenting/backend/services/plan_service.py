@@ -9,7 +9,7 @@ import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_parenting.backend.models import AISession, Child, DayTask, Plan
@@ -56,11 +56,11 @@ async def create_plan_from_ai_result(
         .values(status="superseded")
     )
 
-    # 2. 计算版本号
+    # 2. 计算版本号（P1-3: 使用 COUNT 代替全量加载）
     count_result = await db.execute(
-        select(Plan).where(Plan.child_id == child.id)
+        select(func.count()).select_from(Plan).where(Plan.child_id == child.id)
     )
-    version = len(count_result.scalars().all()) + 1
+    version = (count_result.scalar() or 0) + 1
 
     today = date.today()
 
@@ -151,7 +151,9 @@ async def update_day_task_completion(
         if t.completion_status
         in (CompletionStatus.EXECUTED.value, CompletionStatus.PARTIAL.value)
     )
-    plan.completion_rate = completed_count / 7.0
+    # P2-2: 使用实际 day_tasks 数量代替硬编码 7
+    total_tasks = len(plan.day_tasks) or 7
+    plan.completion_rate = completed_count / total_tasks
 
     await db.flush()
     await db.refresh(target_task)
@@ -228,35 +230,37 @@ async def advance_all_plans(db: AsyncSession) -> dict:
     """推进所有活跃计划的 current_day。
 
     每日零点调用，执行以下逻辑：
-    - current_day < 7 → current_day + 1
-    - current_day >= 7 → status 设为 "completed"
+    - current_day < 7 → current_day + 1（批量 SQL）
+    - current_day >= 7 → status 设为 "completed"（批量 SQL）
+
+    对推进到第 7 天的计划单独查询以触发周反馈。
 
     Returns:
         统计信息字典 {"advanced": N, "completed": N}
     """
-    result = await db.execute(
-        select(Plan).where(Plan.status == "active")
+    now = datetime.now(timezone.utc)
+
+    # P1-4: 批量 SQL 完成计划（current_day >= 7）
+    completed_result = await db.execute(
+        update(Plan)
+        .where(Plan.status == "active", Plan.current_day >= 7)
+        .values(status="completed", updated_at=now)
     )
-    active_plans = list(result.scalars().all())
+    completed_count = completed_result.rowcount  # type: ignore[union-attr]
 
-    advanced_count = 0
-    completed_count = 0
-    plans_reaching_day7: list[Plan] = []
+    # P1-4: 批量 SQL 推进普通计划（current_day < 7）
+    advanced_result = await db.execute(
+        update(Plan)
+        .where(Plan.status == "active", Plan.current_day < 7)
+        .values(current_day=Plan.current_day + 1, updated_at=now)
+    )
+    advanced_count = advanced_result.rowcount  # type: ignore[union-attr]
 
-    for plan in active_plans:
-        if plan.current_day >= 7:
-            # 计划已到期，标记完成
-            plan.status = "completed"
-            plan.updated_at = datetime.now(timezone.utc)
-            completed_count += 1
-        else:
-            plan.current_day += 1
-            plan.updated_at = datetime.now(timezone.utc)
-            advanced_count += 1
-
-            # 记录推进到第 7 天的计划（用于触发周反馈）
-            if plan.current_day == 7:
-                plans_reaching_day7.append(plan)
+    # 查询推进到第 7 天的计划（用于触发周反馈）
+    result = await db.execute(
+        select(Plan).where(Plan.status == "active", Plan.current_day == 7)
+    )
+    plans_reaching_day7 = list(result.scalars().all())
 
     await db.flush()
 

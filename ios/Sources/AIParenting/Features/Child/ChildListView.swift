@@ -14,6 +14,8 @@ public struct ChildListView: View {
     @State private var viewModel: ChildViewModel?
     @State private var showCreateSheet = false
     @State private var editingChild: ChildResponse?
+    @State private var switchToast: String?
+    @State private var showSwitchToast = false
 
     public init() {}
 
@@ -61,6 +63,24 @@ public struct ChildListView: View {
                     await vm.loadChildren()
                 }
             }
+            .overlay(alignment: .top) {
+                if showSwitchToast, let message = switchToast {
+                    Text(message)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule()
+                                .fill(Color.appPrimary)
+                                .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                        )
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .padding(.top, 8)
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: showSwitchToast)
         }
     }
 
@@ -92,7 +112,16 @@ public struct ChildListView: View {
                     childRow(child)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            appState.setActiveChild(child)
+                            if child.id != appState.activeChildId {
+                                appState.setActiveChild(child)
+                                let generator = UIImpactFeedbackGenerator(style: .medium)
+                                generator.impactOccurred()
+                                switchToast = "已切换到 \(child.nickname)"
+                                showSwitchToast = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    showSwitchToast = false
+                                }
+                            }
                         }
                 }
             }

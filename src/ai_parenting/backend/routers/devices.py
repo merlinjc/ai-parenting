@@ -8,29 +8,22 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_parenting.backend.auth import get_current_user_id
 from ai_parenting.backend.database import get_db
 from ai_parenting.backend.models import Device, User
 from ai_parenting.backend.schemas import DeviceRegisterRequest, DeviceResponse
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
-_DEFAULT_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-
-
-def _get_user_id(x_user_id: str | None = Header(None)) -> uuid.UUID:
-    if x_user_id:
-        return uuid.UUID(x_user_id)
-    return _DEFAULT_USER_ID
-
 
 @router.post("", response_model=DeviceResponse, status_code=201)
 async def register_device(
     body: DeviceRegisterRequest,
-    user_id: uuid.UUID = Depends(_get_user_id),
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> DeviceResponse:
     """注册或更新设备信息。

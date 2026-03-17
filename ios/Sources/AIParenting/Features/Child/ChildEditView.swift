@@ -137,6 +137,7 @@ public struct ChildEditView: View {
         do {
             let _: ChildResponse = try await apiClient.request(.updateChild(child.id, data))
             onUpdated?()
+            dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_parenting.backend.audit import log_ai_session
@@ -138,7 +139,7 @@ async def generate_feedback_background(
         tzinfo=timezone.utc,
     )
     weekly_records = await record_service.get_weekly_records(db, child.id, plan_start)
-    record_count = await record_service.count_weekly_records(db, child.id, plan_start)
+    record_count = len(weekly_records)  # P2-6: 用 len 代替额外 COUNT 查询
     recent_records = await record_service.get_recent_records(db, child.id, count=5)
 
     # 构建 day_tasks_summary

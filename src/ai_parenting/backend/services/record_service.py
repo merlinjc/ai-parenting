@@ -168,3 +168,57 @@ async def count_weekly_records(
         )
     )
     return result.scalar_one()
+
+
+async def get_streak_days(db: AsyncSession, child_id: uuid.UUID) -> int:
+    """计算指定儿童的连续打卡天数。
+
+    从今天往前倒推，统计连续有记录的天数。
+    为控制性能，最多查最近 90 天的记录。
+    使用 DISTINCT + DATE 在数据库端去重，减少传输量。
+
+    Returns:
+        连续天数（今天有记录则从今天开始计数，否则从昨天开始）。
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    result = await db.execute(
+        select(func.date(Record.created_at))
+        .where(
+            Record.child_id == child_id,
+            Record.created_at >= cutoff,
+        )
+        .group_by(func.date(Record.created_at))
+        .order_by(func.date(Record.created_at).desc())
+    )
+    rows = result.all()
+
+    if not rows:
+        return 0
+
+    # 将数据库返回值统一转为 date 对象
+    from datetime import date as date_type
+
+    record_dates: list[date_type] = []
+    for (d,) in rows:
+        if isinstance(d, str):
+            record_dates.append(date_type.fromisoformat(d))
+        else:
+            record_dates.append(d)
+
+    today = datetime.now(timezone.utc).date()
+    streak = 0
+    expected = today
+
+    for d in record_dates:
+        if d == expected:
+            streak += 1
+            expected -= timedelta(days=1)
+        elif d == expected - timedelta(days=1) and streak == 0:
+            # 今天还没记录，从昨天开始算连续
+            expected = d
+            streak = 1
+            expected -= timedelta(days=1)
+        else:
+            break
+
+    return streak

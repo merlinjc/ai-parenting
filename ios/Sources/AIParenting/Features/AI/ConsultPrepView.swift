@@ -1,44 +1,44 @@
 import SwiftUI
 
 /// 咨询准备数据模型
-struct ConsultPrepData: Codable, Sendable {
-    let childInfo: ConsultPrepChildInfo
-    let recentRecords: [ConsultPrepRecord]
-    let aiSuggestions: [ConsultPrepSuggestion]
-    let checklist: [ConsultPrepCheckItem]
-    let recordCount: Int
-    let generatedAt: String
+public struct ConsultPrepData: Codable, Sendable {
+    public let childInfo: ConsultPrepChildInfo
+    public let recentRecords: [ConsultPrepRecord]
+    public let aiSuggestions: [ConsultPrepSuggestion]
+    public let checklist: [ConsultPrepCheckItem]
+    public let recordCount: Int
+    public let generatedAt: String
 }
 
-struct ConsultPrepChildInfo: Codable, Sendable {
-    let nickname: String
-    let ageMonths: Int
-    let stage: String
-    let riskLevel: String
-    let focusThemes: [String]
+public struct ConsultPrepChildInfo: Codable, Sendable {
+    public let nickname: String
+    public let ageMonths: Int
+    public let stage: String
+    public let riskLevel: String
+    public let focusThemes: [String]
 }
 
-struct ConsultPrepRecord: Codable, Sendable, Identifiable {
-    var id: String { date }
-    let date: String
-    let type: String
-    let content: String
-    let tags: [String]
-    let theme: String?
+public struct ConsultPrepRecord: Codable, Sendable, Identifiable {
+    public var id: String { "\(date)_\(type)_\(content.prefix(20))" }
+    public let date: String
+    public let type: String
+    public let content: String
+    public let tags: [String]
+    public let theme: String?
 }
 
-struct ConsultPrepSuggestion: Codable, Sendable, Identifiable {
-    var id: String { date }
-    let date: String
-    let scenario: String?
-    let reason: String
-    let summary: String
+public struct ConsultPrepSuggestion: Codable, Sendable, Identifiable {
+    public var id: String { "\(date)_\(reason.prefix(20))" }
+    public let date: String
+    public let scenario: String?
+    public let reason: String
+    public let summary: String
 }
 
-struct ConsultPrepCheckItem: Codable, Sendable, Identifiable {
-    var id: String { item }
-    let item: String
-    let checked: Bool
+public struct ConsultPrepCheckItem: Codable, Sendable, Identifiable {
+    public var id: String { item }
+    public let item: String
+    public let checked: Bool
 }
 
 /// 咨询准备页面
@@ -48,17 +48,17 @@ struct ConsultPrepCheckItem: Codable, Sendable, Identifiable {
 /// - 最近观察记录摘要
 /// - AI 咨询建议
 /// - 就诊准备清单
-struct ConsultPrepView: View {
+public struct ConsultPrepView: View {
 
-    let childId: UUID
-    let apiClient: APIClientProtocol
+    public let childId: UUID
+    public let apiClient: APIClientProtocol
 
     @State private var data: ConsultPrepData?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var checkedItems: Set<String> = []
 
-    var body: some View {
+    public var body: some View {
         ScrollView {
             if isLoading {
                 VStack(spacing: 16) {
@@ -311,8 +311,10 @@ struct ConsultPrepView: View {
         do {
             let result: ConsultPrepData = try await apiClient.request(.getConsultPrep(childId: childId))
             data = result
+        } catch let apiError as APIError {
+            errorMessage = "加载失败：\(apiError.localizedDescription)"
         } catch {
-            errorMessage = "加载失败，请稍后重试"
+            errorMessage = "加载失败：\(error.localizedDescription)"
         }
 
         isLoading = false

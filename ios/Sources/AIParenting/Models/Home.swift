@@ -9,6 +9,9 @@ public struct HomeSummaryResponse: Codable, Sendable {
     public let unreadCount: Int
     public let weeklyFeedbackStatus: String?
     public let weeklyFeedbackId: UUID?
+    public let greeting: String
+    public let streakDays: Int
+    public let weekDayStatuses: [String]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -19,10 +22,14 @@ public struct HomeSummaryResponse: Codable, Sendable {
         unreadCount = try container.decodeIfPresent(Int.self, forKey: .unreadCount) ?? 0
         weeklyFeedbackStatus = try container.decodeIfPresent(String.self, forKey: .weeklyFeedbackStatus)
         weeklyFeedbackId = try container.decodeIfPresent(UUID.self, forKey: .weeklyFeedbackId)
+        greeting = try container.decodeIfPresent(String.self, forKey: .greeting) ?? ""
+        streakDays = try container.decodeIfPresent(Int.self, forKey: .streakDays) ?? 0
+        weekDayStatuses = try container.decodeIfPresent([String].self, forKey: .weekDayStatuses) ?? []
     }
 
     private enum CodingKeys: String, CodingKey {
         case child, activePlan, todayTask, recentRecords, unreadCount
         case weeklyFeedbackStatus, weeklyFeedbackId
+        case greeting, streakDays, weekDayStatuses
     }
 }

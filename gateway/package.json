@@ -1,0 +1,20 @@
+{
+  "name": "aip-openclaw-gateway",
+  "version": "1.0.0",
+  "description": "AI Parenting OpenClaw Gateway — WhatsApp/Telegram message relay",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "optionalDependencies": {
+    "@whiskeysockets/baileys": "^6.6.0",
+    "grammy": "^1.21.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

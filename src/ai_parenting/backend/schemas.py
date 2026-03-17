@@ -389,6 +389,9 @@ class HomeSummaryResponse(BaseModel):
     unread_count: int = 0
     weekly_feedback_status: str | None = None
     weekly_feedback_id: uuid.UUID | None = None
+    greeting: str = ""
+    streak_days: int = 0
+    week_day_statuses: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -407,6 +410,7 @@ class UserProfileResponse(BaseModel):
     created_at: UTCDatetime
     updated_at: UTCDatetime
     children: list[ChildResponse] = Field(default_factory=list)
+    channel_bindings: list["ChannelBindingResponse"] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -485,3 +489,241 @@ class FileUploadResponse(BaseModel):
     url: str
     filename: str
     size: int
+
+
+# ---------------------------------------------------------------------------
+# ChannelBinding（渠道绑定）
+# ---------------------------------------------------------------------------
+
+
+class ChannelBindingCreate(BaseModel):
+    """绑定渠道请求。"""
+
+    channel: str = Field(..., description="渠道类型：apns/wechat/whatsapp/telegram")
+    channel_user_id: str = Field(..., min_length=1, max_length=500, description="渠道侧用户标识")
+    device_id: uuid.UUID | None = Field(None, description="APNs 渠道关联的 Device ID")
+    display_label: str | None = Field(None, max_length=100, description="展示名称（如微信昵称）")
+
+    @field_validator("channel")
+    @classmethod
+    def validate_channel(cls, v: str) -> str:
+        allowed = ("apns", "wechat", "whatsapp", "telegram")
+        if v not in allowed:
+            raise ValueError(f"channel 必须为 {'/'.join(allowed)}")
+        return v
+
+
+class ChannelBindingResponse(BaseModel):
+    """渠道绑定响应。"""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    channel: str
+    channel_user_id: str
+    device_id: uuid.UUID | None = None
+    display_label: str | None = None
+    is_active: bool = True
+    verified_at: UTCDatetime | None = None
+    created_at: UTCDatetime
+    updated_at: UTCDatetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChannelBindingListResponse(BaseModel):
+    """渠道绑定列表响应。"""
+
+    bindings: list[ChannelBindingResponse]
+
+
+# ---------------------------------------------------------------------------
+# UserChannelPreference（用户渠道偏好）
+# ---------------------------------------------------------------------------
+
+
+class ChannelPreferenceUpdate(BaseModel):
+    """更新渠道偏好请求。"""
+
+    channel_priority: list[str] | None = Field(
+        None, description="渠道优先级排序，如 ['wechat', 'apns']"
+    )
+    quiet_start_hour: int | None = Field(None, ge=0, le=23, description="静默开始时（本地时间 0-23）")
+    quiet_end_hour: int | None = Field(None, ge=0, le=23, description="静默结束时（本地时间 0-23）")
+    max_daily_pushes: int | None = Field(None, ge=1, le=50, description="每日最大推送数")
+
+    @field_validator("channel_priority")
+    @classmethod
+    def validate_channel_priority(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None:
+            allowed = {"apns", "wechat", "whatsapp", "telegram"}
+            for ch in v:
+                if ch not in allowed:
+                    raise ValueError(f"无效渠道类型: {ch}")
+            if len(v) != len(set(v)):
+                raise ValueError("渠道优先级不能包含重复项")
+        return v
+
+
+class ChannelPreferenceResponse(BaseModel):
+    """渠道偏好响应。"""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    channel_priority: list[str]
+    quiet_start_hour: int = 22
+    quiet_end_hour: int = 8
+    max_daily_pushes: int = 5
+    created_at: UTCDatetime
+    updated_at: UTCDatetime
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# PushLog（推送日志）
+# ---------------------------------------------------------------------------
+
+
+class PushLogResponse(BaseModel):
+    """推送日志响应。"""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    rule_id: str | None = None
+    message_id: uuid.UUID | None = None
+    channel: str
+    status: str
+    error: str | None = None
+    latency_ms: int | None = None
+    fallback_used: bool = False
+    fallback_channel: str | None = None
+    created_at: UTCDatetime
+
+    model_config = {"from_attributes": True}
+
+
+class PushLogListResponse(BaseModel):
+    """推送日志列表响应。"""
+
+    logs: list[PushLogResponse]
+    has_more: bool
+    total: int
+
+
+# ---------------------------------------------------------------------------
+# Voice（语音交互 — iOS 原生优先，后端处理意图+Skill）
+# ---------------------------------------------------------------------------
+
+
+class VoiceConverseRequest(BaseModel):
+    """语音对话请求（接收 iOS 端 ASR 转写后的文本）。"""
+
+    transcript: str = Field(..., min_length=1, max_length=2000, description="ASR 转写文本")
+    child_id: uuid.UUID
+    confidence: float | None = Field(None, ge=0.0, le=1.0, description="iOS ASR 置信度")
+
+
+class VoiceConverseResponse(BaseModel):
+    """语音对话响应（返回纯文本，由 iOS 端 TTS 播报）。"""
+
+    reply_text: str
+    intent: str
+    action_taken: dict | None = None
+    should_fallback_to_cloud_asr: bool = False  # 建议 iOS 端降级到云端 ASR
+    record_id: str | None = None  # 快速记录创建后的 record_id
+
+
+class VoiceTranscribeRequest(BaseModel):
+    """[Optional] 云端 ASR Fallback 请求。"""
+
+    audio_url: str = Field(..., description="音频文件 URL")
+    language: str = Field(default="zh-CN")
+
+
+class VoiceTranscribeResponse(BaseModel):
+    """[Optional] 云端 ASR Fallback 响应。"""
+
+    transcript: str
+    confidence: float
+    duration_ms: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# 微信 OAuth 绑定
+# ---------------------------------------------------------------------------
+
+
+class WeChatQRCodeResponse(BaseModel):
+    """微信 OAuth 绑定二维码响应。"""
+
+    qrcode_url: str
+    state: str  # 用于校验回调
+    expires_in: int = 300  # 二维码有效期（秒）
+
+
+# ---------------------------------------------------------------------------
+# Skill（技能系统 — Phase 3）
+# ---------------------------------------------------------------------------
+
+
+class SkillInfoResponse(BaseModel):
+    """单个技能信息响应。"""
+
+    name: str
+    display_name: str
+    description: str
+    version: str
+    icon: str = ""
+    tags: list[str] = []
+    is_enabled: bool = True
+    session_type: str | None = None
+
+
+class SkillListResponse(BaseModel):
+    """技能列表响应。"""
+
+    skills: list[SkillInfoResponse]
+    total: int
+
+
+class SleepAnalysisRequest(BaseModel):
+    """睡眠分析请求。"""
+
+    child_id: uuid.UUID
+    sleep_records: list[dict] = Field(..., min_length=1, max_length=14)
+
+
+class SleepAnalysisResponse(BaseModel):
+    """睡眠分析响应。"""
+
+    overall_rating: str
+    rating_display: str
+    avg_total_hours: float
+    avg_night_wakings: float
+    bedtime_consistency: str
+    summary_text: str
+    recommendations: list[str]
+    age_reference: str
+
+
+# ---------------------------------------------------------------------------
+# Memory（OpenClaw 记忆初始化）
+# ---------------------------------------------------------------------------
+
+
+class MemoryInitRequest(BaseModel):
+    """记忆初始化请求。"""
+
+    child_id: uuid.UUID
+    caregiver_role: str = Field(default="", description="照护角色: mother/father/grandparent/other")
+    recent_situation: str = Field(default="", description="用户填写的近况描述")
+
+
+class MemoryInitResponse(BaseModel):
+    """记忆初始化响应。"""
+
+    success: bool
+    files: dict[str, str] = Field(
+        ..., description="初始化的记忆文件名 → 内容映射"
+    )
+    message: str = ""

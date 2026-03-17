@@ -39,6 +39,8 @@ class HunyuanProvider(ModelProvider):
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._model = model
+        # P1-9: 持久化 HTTP 客户端，复用 TCP 连接
+        self._client = httpx.AsyncClient(timeout=httpx.Timeout(90.0))
 
     @property
     def provider_name(self) -> str:
@@ -92,10 +94,11 @@ class HunyuanProvider(ModelProvider):
         )
 
         try:
-            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
+            response = await self._client.post(
+                url, headers=headers, json=payload, timeout=timeout_seconds,
+            )
+            response.raise_for_status()
+            data = response.json()
 
             # 从 OpenAI 兼容格式中提取内容
             content = data["choices"][0]["message"]["content"]
@@ -137,3 +140,8 @@ class HunyuanProvider(ModelProvider):
             raise ValueError(
                 f"Unexpected Hunyuan API response format: missing {exc}"
             ) from exc
+
+    async def close(self) -> None:
+        """释放持久化 HTTP 客户端资源。"""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()

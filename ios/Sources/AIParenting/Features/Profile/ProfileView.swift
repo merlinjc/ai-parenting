@@ -14,8 +14,11 @@ public struct ProfileView: View {
     @State private var editDisplayName = ""
     @State private var editCaregiverRole = ""
     @State private var isSubmitting = false
+    @State private var saveErrorMessage: String?
 
     public init() {}
+
+    @State private var showLogoutConfirm = false
 
     public var body: some View {
         NavigationStack {
@@ -31,6 +34,9 @@ public struct ProfileView: View {
 
                 // 关于
                 aboutSection
+
+                // 账号操作
+                accountSection
             }
             .navigationTitle("我的")
             .toolbar {
@@ -40,6 +46,19 @@ public struct ProfileView: View {
             }
             .sheet(isPresented: $isEditing) {
                 profileEditSheet
+            }
+            .alert("确认退出", isPresented: $showLogoutConfirm) {
+                Button("取消", role: .cancel) {}
+                Button("退出登录", role: .destructive) {
+                    dismiss()
+                    // 延迟执行让 sheet 关闭动画完成
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        appState.logout()
+                    }
+                }
+            } message: {
+                Text("退出登录后需要重新输入账号密码")
             }
         }
     }
@@ -145,6 +164,18 @@ public struct ProfileView: View {
 
     private var settingsSection: some View {
         Section("设置") {
+            NavigationLink {
+                ChannelManageView()
+            } label: {
+                Label("消息渠道", systemImage: "paperplane")
+            }
+
+            NavigationLink {
+                SkillListView()
+            } label: {
+                Label("AI 能力", systemImage: "cpu")
+            }
+
             HStack {
                 Label("推送通知", systemImage: "bell.badge")
                 Spacer()
@@ -168,14 +199,30 @@ public struct ProfileView: View {
             HStack {
                 Text("版本")
                 Spacer()
-                Text("0.4.0")
+                Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                     .foregroundStyle(.secondary)
             }
             HStack {
-                Text("产品阶段")
+                Text("构建号")
                 Spacer()
-                Text("MS2 开发验证")
+                Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: - Account Section
+
+    private var accountSection: some View {
+        Section {
+            Button(role: .destructive) {
+                showLogoutConfirm = true
+            } label: {
+                HStack {
+                    Spacer()
+                    Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                    Spacer()
+                }
             }
         }
     }
@@ -194,6 +241,14 @@ public struct ProfileView: View {
                         Text("爸爸").tag("father")
                         Text("祖辈").tag("grandparent")
                         Text("其他照护者").tag("other")
+                    }
+                }
+
+                if let saveErrorMessage {
+                    Section {
+                        Text(saveErrorMessage)
+                            .foregroundStyle(.red)
+                            .font(.caption)
                     }
                 }
             }
@@ -224,6 +279,7 @@ public struct ProfileView: View {
     @MainActor
     private func saveProfile() async {
         isSubmitting = true
+        saveErrorMessage = nil
         let update = UserProfileUpdate(
             displayName: editDisplayName.isEmpty ? nil : editDisplayName,
             caregiverRole: editCaregiverRole.isEmpty ? nil : editCaregiverRole
@@ -234,7 +290,7 @@ public struct ProfileView: View {
             await appState.refreshProfile()
             isEditing = false
         } catch {
-            // 简单处理错误
+            saveErrorMessage = "保存失败：\(error.localizedDescription)"
         }
         isSubmitting = false
     }

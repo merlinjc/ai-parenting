@@ -1,6 +1,6 @@
 """开发环境种子数据。
 
-幂等插入默认 User 和 Child，与 iOS 客户端硬编码的 UUID 对齐。
+幂等插入默认 User（管理员）、普通 User 和 Child，与 iOS 客户端硬编码的 UUID 对齐。
 每次 app 启动时调用，已存在则跳过。
 """
 
@@ -12,6 +12,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_parenting.backend.auth import hash_password
 from ai_parenting.backend.models import Child, User
 
 logger = logging.getLogger(__name__)
@@ -19,12 +20,35 @@ logger = logging.getLogger(__name__)
 # 与 iOS 端硬编码对齐的 UUID
 DEFAULT_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 DEFAULT_CHILD_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
+ADMIN_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000099")
 
 
 async def seed_dev_data(session: AsyncSession) -> None:
     """幂等插入开发环境默认数据。"""
 
-    # ---- User ----
+    # ---- Admin User ----
+    result = await session.execute(select(User).where(User.id == ADMIN_USER_ID))
+    if result.scalar_one_or_none() is None:
+        admin = User(
+            id=ADMIN_USER_ID,
+            email="admin@aiparenting.dev",
+            hashed_password=hash_password("admin123"),
+            auth_provider="email",
+            display_name="系统管理员",
+            caregiver_role=None,
+            timezone="Asia/Shanghai",
+            is_admin=True,
+        )
+        session.add(admin)
+        logger.info("Seed: created admin User %s (admin@aiparenting.dev)", ADMIN_USER_ID)
+    else:
+        # 确保已有用户拥有 admin 权限
+        admin = await session.get(User, ADMIN_USER_ID)
+        if admin and not admin.is_admin:
+            admin.is_admin = True
+            logger.info("Seed: upgraded User %s to admin", ADMIN_USER_ID)
+
+    # ---- Default Dev User ----
     result = await session.execute(select(User).where(User.id == DEFAULT_USER_ID))
     if result.scalar_one_or_none() is None:
         user = User(

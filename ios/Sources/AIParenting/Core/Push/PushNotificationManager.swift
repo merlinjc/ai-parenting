@@ -12,7 +12,8 @@ import Observation
 /// 集中管理推送权限请求、APNs 注册和通知接收处理。
 /// 通知点击时解析 userInfo 中的 target_page/message_id，驱动 AppState 深链导航。
 @Observable
-public final class PushNotificationManager: NSObject, @unchecked Sendable {
+@MainActor
+public final class PushNotificationManager: NSObject {
 
     /// 是否已获取通知权限
     public var isAuthorized = false
@@ -23,7 +24,7 @@ public final class PushNotificationManager: NSObject, @unchecked Sendable {
     /// 权限被拒绝
     public var permissionDenied = false
 
-    /// 导航回调（由 AppState 设置）
+    /// 导航回调（由 AppState 设置，在 MainActor 上调用）
     public var onNotificationTapped: ((_ target: String, _ params: [String: String]) -> Void)?
 
     public override init() {
@@ -66,7 +67,6 @@ public final class PushNotificationManager: NSObject, @unchecked Sendable {
 
     /// 处理 APNs 注册失败
     public func handleRegistrationError(_ error: Error) {
-        // 静默记录错误，不影响正常使用
         print("[PushNotificationManager] Registration failed: \(error.localizedDescription)")
     }
 }
@@ -76,7 +76,7 @@ public final class PushNotificationManager: NSObject, @unchecked Sendable {
 extension PushNotificationManager: UNUserNotificationCenterDelegate {
 
     /// 前台通知展示策略：仍然显示 banner + sound + badge
-    public func userNotificationCenter(
+    nonisolated public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
@@ -85,7 +85,7 @@ extension PushNotificationManager: UNUserNotificationCenterDelegate {
     }
 
     /// 通知点击处理：解析 userInfo 中的 target_page 和参数，触发深链导航
-    public func userNotificationCenter(
+    nonisolated public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
@@ -104,7 +104,7 @@ extension PushNotificationManager: UNUserNotificationCenterDelegate {
                 params["feedback_id"] = feedbackId
             }
 
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 self?.onNotificationTapped?(targetPage, params)
             }
         }

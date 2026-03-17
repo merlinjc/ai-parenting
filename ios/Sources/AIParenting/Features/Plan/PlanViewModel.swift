@@ -19,6 +19,8 @@ public final class PlanViewModel {
     public var error: APIError?
     public var updateError: APIError?
 
+    public var isUpdating = false
+
     /// 历次计划列表
     public var planHistory: [PlanResponse] = []
     public var isLoadingHistory = false
@@ -106,27 +108,35 @@ public final class PlanViewModel {
 
     @MainActor
     public func updateCompletion(dayNumber: Int, status: CompletionStatus) async {
+        guard !isUpdating else { return }
+        isUpdating = true
         updateError = nil
-        guard let planId = plan?.id else { return }
+        guard let planId = plan?.id else {
+            isUpdating = false
+            return
+        }
+
+        // 乐观更新 UI（立即反馈，无需等待网络）
+        if let index = plan?.dayTasks.firstIndex(where: { $0.dayNumber == dayNumber }) {
+            plan?.dayTasks[index].completionStatus = status.rawValue
+        }
+
         let update = DayTaskCompletionUpdate(completionStatus: status.rawValue)
         do {
-            let updatedTask: DayTaskResponse = try await apiClient.request(
+            let _: DayTaskResponse = try await apiClient.request(
                 .updateDayTaskCompletion(planId: planId, dayNumber: dayNumber, update)
             )
-            // 更新本地任务列表中对应的日任务
-            if var currentPlan = plan {
-                var tasks = currentPlan.dayTasks
-                if let index = tasks.firstIndex(where: { $0.dayNumber == dayNumber }) {
-                    tasks[index] = updatedTask
-                }
-                // 重新加载计划以获取更新后的 completion_rate
-                await loadPlan(planId: planId)
-            }
+            // 后台重新加载计划以获取准确的 completion_rate
+            await loadPlan(planId: planId)
         } catch let apiError as APIError {
             updateError = apiError
+            // 回滚乐观更新：重新加载以恢复服务端状态
+            await loadPlan(planId: planId)
         } catch {
             updateError = .networkError(underlying: error)
+            await loadPlan(planId: planId)
         }
+        isUpdating = false
     }
 
     @MainActor

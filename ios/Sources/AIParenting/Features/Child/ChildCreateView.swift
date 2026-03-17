@@ -62,7 +62,8 @@ public struct ChildCreateView: View {
     private var yearPicker: some View {
         Picker("年", selection: $birthYear) {
             let currentYear = Calendar.current.component(.year, from: Date())
-            ForEach((currentYear - 4)...(currentYear - 1), id: \.self) { year in
+            // 支持 18-48 个月（约 1.5-4 岁），扩展到 currentYear 支持不满 1 岁的边缘情况
+            ForEach((currentYear - 5)...currentYear, id: \.self) { year in
                 Text("\(String(year))年").tag(year)
             }
         }
@@ -180,6 +181,7 @@ public struct ChildCreateView: View {
         do {
             let child: ChildResponse = try await apiClient.request(.createChild(data))
             onCreated?(child)
+            dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }

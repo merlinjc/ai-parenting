@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_parenting.backend.auth import get_current_user_id
 from ai_parenting.backend.database import get_db
+from ai_parenting.backend.services.child_service import get_child
 from ai_parenting.backend.services.consult_prep_service import get_consult_prep_data
 
 router = APIRouter(prefix="/consult-prep", tags=["consult-prep"])
@@ -27,6 +28,12 @@ async def get_consult_prep(
 
     聚合最近观察记录、AI 咨询建议和就诊准备清单。
     """
+    # P1-11: 校验 child_id 所有权
+    child = await get_child(db, child_id)
+    if child is None:
+        raise HTTPException(status_code=404, detail="Child not found")
+    if child.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问此儿童数据")
     try:
         data = await get_consult_prep_data(db, child_id)
         return data

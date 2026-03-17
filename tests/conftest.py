@@ -22,7 +22,13 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from ai_parenting.backend.database import get_db
-from ai_parenting.backend.deps import get_orchestrator, get_push_provider
+from ai_parenting.backend.deps import (
+    get_channel_router,
+    get_orchestrator,
+    get_push_engine,
+    get_push_provider,
+    get_skill_registry,
+)
 from ai_parenting.backend.models import Base
 from ai_parenting.backend.services.push_service import MockPushProvider, PushProvider
 from ai_parenting.orchestrator import Orchestrator
@@ -65,10 +71,23 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture
-def orchestrator() -> Orchestrator:
-    """创建使用 MockProvider 的 Orchestrator。"""
+def skill_registry():
+    """创建带有自动发现的 SkillRegistry。"""
+    from pathlib import Path
+
+    from ai_parenting.skills.registry import SkillRegistry
+
+    registry = SkillRegistry()
+    adapters_path = Path(__file__).resolve().parent.parent / "src" / "ai_parenting" / "skills" / "adapters"
+    registry.discover_and_register(adapters_path)
+    return registry
+
+
+@pytest.fixture
+def orchestrator(skill_registry) -> Orchestrator:
+    """创建使用 MockProvider + SkillRegistry 的 Orchestrator。"""
     provider = MockProvider()
-    return Orchestrator(provider=provider)
+    return Orchestrator(provider=provider, skill_registry=skill_registry)
 
 
 @pytest.fixture
@@ -82,6 +101,7 @@ async def client(
     db_session: AsyncSession,
     orchestrator: Orchestrator,
     push_provider: MockPushProvider,
+    skill_registry,
 ) -> AsyncGenerator[AsyncClient, None]:
     """创建测试用 HTTP 客户端。"""
     from ai_parenting.backend.app import create_app
@@ -98,9 +118,28 @@ async def client(
     def _override_get_push_provider() -> PushProvider:
         return push_provider
 
+    def _override_get_skill_registry():
+        return skill_registry
+
+    # Mock ChannelRouter（避免测试时初始化真实渠道适配器）
+    class _MockChannelRouter:
+        async def send(self, user_id, channel, message):
+            return {"status": "mock_sent"}
+
+        async def health_check(self):
+            return {"status": "healthy"}
+
+    # Mock SmartPushEngine
+    class _MockPushEngine:
+        async def evaluate_rules(self, *args, **kwargs):
+            return []
+
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_orchestrator] = _override_get_orchestrator
     app.dependency_overrides[get_push_provider] = _override_get_push_provider
+    app.dependency_overrides[get_skill_registry] = _override_get_skill_registry
+    app.dependency_overrides[get_channel_router] = lambda: _MockChannelRouter()
+    app.dependency_overrides[get_push_engine] = lambda: _MockPushEngine()
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

@@ -25,7 +25,7 @@ public struct MessageResponse: Codable, Sendable, Identifiable {
     public let targetPage: String?
     public let targetParams: AnyCodable?
     public let requiresPreview: Bool
-    public let readStatus: String
+    public var readStatus: String
     public let pushStatus: String
     public let pushSentAt: Date?
     public let pushDeliveredAt: Date?

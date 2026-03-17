@@ -10,6 +10,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_parenting.backend.auth import get_current_user_id
 from ai_parenting.backend.database import get_db
 from ai_parenting.backend.deps import get_orchestrator
 from ai_parenting.backend.schemas import AISessionResponse, InstantHelpRequest
@@ -17,6 +18,7 @@ from ai_parenting.backend.services.ai_session_service import (
     create_instant_help_session,
     get_session,
 )
+from ai_parenting.backend.services.child_service import get_child
 from ai_parenting.orchestrator import Orchestrator
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -25,6 +27,7 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 @router.post("/instant-help", response_model=AISessionResponse, status_code=201)
 async def instant_help(
     body: InstantHelpRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
     orchestrator: Orchestrator = Depends(get_orchestrator),
 ) -> AISessionResponse:
@@ -33,6 +36,13 @@ async def instant_help(
     同步模式：等待 AI 调用完成后返回完整结果。
     超时自动降级为 degraded_result。
     """
+    # 校验 child_id 所有权
+    child = await get_child(db, body.child_id)
+    if child is None:
+        raise HTTPException(status_code=404, detail="Child not found")
+    if child.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权操作此儿童")
+
     try:
         session = await create_instant_help_session(
             db,
@@ -51,10 +61,15 @@ async def instant_help(
 @router.get("/sessions/{session_id}", response_model=AISessionResponse)
 async def get_ai_session(
     session_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> AISessionResponse:
     """获取 AI 会话状态和结果（支持轮询）。"""
     session = await get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
+    # 校验会话所属儿童的所有权
+    child = await get_child(db, session.child_id)
+    if child is None or child.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问此会话")
     return AISessionResponse.model_validate(session)

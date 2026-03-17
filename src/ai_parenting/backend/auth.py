@@ -128,5 +128,33 @@ async def get_current_user_id(
                 detail="Invalid X-User-Id header",
             )
 
-    # 开发环境默认用户
-    return _DEFAULT_USER_ID
+    # 开发环境默认用户 — 生产环境要求必须提供有效凭证
+    from ai_parenting.backend.config import settings
+
+    if getattr(settings, "debug", False) or settings.database_url.startswith("sqlite"):
+        return _DEFAULT_USER_ID
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+    )
+
+
+async def get_current_admin_id(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> uuid.UUID:
+    """验证当前用户是否为管理员。
+
+    在 get_current_user_id 基础上追加 is_admin 检查。
+    非管理员返回 403 Forbidden。
+    """
+    from ai_parenting.backend.models import User  # noqa: local import 避免循环
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user_id

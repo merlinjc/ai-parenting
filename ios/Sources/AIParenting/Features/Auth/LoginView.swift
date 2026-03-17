@@ -8,14 +8,42 @@ struct LoginView: View {
 
     @State private var email = ""
     @State private var password = ""
+    @State private var confirmPassword = ""
     @State private var displayName = ""
     @State private var isRegistering = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var agreedToTerms = false
+    @State private var showTerms = false
+    @State private var showPrivacy = false
 
     let apiClient: APIClientProtocol
     let authProvider: JWTAuthProvider
     let onLoginSuccess: () -> Void
+
+    /// 邮箱格式校验
+    private var isValidEmail: Bool {
+        let pattern = #"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"#
+        return email.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    /// 密码强度校验（至少 8 位）
+    private var isValidPassword: Bool {
+        password.count >= 8
+    }
+
+    /// 密码确认匹配
+    private var passwordsMatch: Bool {
+        !isRegistering || password == confirmPassword
+    }
+
+    /// 表单是否可提交
+    private var canSubmit: Bool {
+        if isRegistering {
+            return isValidEmail && isValidPassword && passwordsMatch && agreedToTerms && !isLoading
+        }
+        return !email.isEmpty && !password.isEmpty && !isLoading
+    }
 
     var body: some View {
         NavigationStack {
@@ -42,17 +70,75 @@ struct LoginView: View {
                             .textContentType(.name)
                     }
 
-                    TextField("邮箱", text: $email)
-                        .textFieldStyle(.roundedBorder)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("邮箱", text: $email)
+                            .textFieldStyle(.roundedBorder)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
 
-                    SecureField("密码", text: $password)
-                        .textFieldStyle(.roundedBorder)
-                        .textContentType(isRegistering ? .newPassword : .password)
+                        if !email.isEmpty && !isValidEmail {
+                            Text("请输入有效的邮箱地址")
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        SecureField("密码", text: $password)
+                            .textFieldStyle(.roundedBorder)
+                            .textContentType(isRegistering ? .newPassword : .password)
+
+                        if isRegistering && !password.isEmpty && !isValidPassword {
+                            Text("密码至少需要 8 个字符")
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
+                    }
+
+                    if isRegistering {
+                        VStack(alignment: .leading, spacing: 4) {
+                            SecureField("确认密码", text: $confirmPassword)
+                                .textFieldStyle(.roundedBorder)
+                                .textContentType(.newPassword)
+
+                            if !confirmPassword.isEmpty && !passwordsMatch {
+                                Text("两次输入的密码不一致")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, 32)
+
+                // 用户协议（注册时显示）
+                if isRegistering {
+                    HStack(spacing: 8) {
+                        Button {
+                            agreedToTerms.toggle()
+                        } label: {
+                            Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(agreedToTerms ? .blue : .secondary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Text("我已阅读并同意")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Button("《用户协议》") { showTerms = true }
+                            .font(.caption)
+
+                        Text("和")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Button("《隐私政策》") { showPrivacy = true }
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 32)
+                }
 
                 // Error Message
                 if let errorMessage {
@@ -79,23 +165,43 @@ struct LoginView: View {
                         .padding(.vertical, 12)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isLoading || email.isEmpty || password.isEmpty)
+                    .disabled(!canSubmit)
                     .padding(.horizontal, 32)
 
-                    Button {
-                        withAnimation {
-                            isRegistering.toggle()
-                            errorMessage = nil
+                    HStack(spacing: 16) {
+                        Button {
+                            withAnimation {
+                                isRegistering.toggle()
+                                errorMessage = nil
+                                confirmPassword = ""
+                                agreedToTerms = false
+                            }
+                        } label: {
+                            Text(isRegistering ? "已有账号？去登录" : "没有账号？去注册")
+                                .font(.subheadline)
                         }
-                    } label: {
-                        Text(isRegistering ? "已有账号？去登录" : "没有账号？去注册")
-                            .font(.subheadline)
+
+                        if !isRegistering {
+                            Text("·")
+                                .foregroundStyle(.secondary)
+
+                            Button {
+                                // TODO: 实现忘记密码流程（发送重置邮件）
+                                errorMessage = "忘记密码功能开发中，请联系客服重置"
+                            } label: {
+                                Text("忘记密码？")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
 
                 Spacer()
 
-                // Skip Login (Dev Mode)
+                #if DEBUG
+                // Skip Login (Dev Mode) — 仅在 DEBUG 构建中可见
+                // 注意：不清除凭证，保留可能已有的 token；如果没有 token 将回退到 X-User-Id 模式
                 Button {
                     onLoginSuccess()
                 } label: {
@@ -104,8 +210,37 @@ struct LoginView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.bottom, 20)
+                #endif
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showTerms) {
+                termsView(title: "用户协议", content: "AI 育儿助手用户服务协议\n\n本协议是您与 AI Parenting 之间关于使用本产品服务所订立的协议。\n\n1. 服务内容\n本产品提供基于 AI 的育儿指导建议，仅供参考，不构成医疗建议。\n\n2. 用户义务\n用户应提供真实信息，不得滥用服务。\n\n3. 免责声明\nAI 生成的建议仅供参考，如有健康问题请咨询专业医生。")
+            }
+            .sheet(isPresented: $showPrivacy) {
+                termsView(title: "隐私政策", content: "AI 育儿助手隐私政策\n\n我们重视您和孩子的隐私保护。\n\n1. 信息收集\n我们收集您主动提供的信息（邮箱、昵称、儿童档案信息）。\n\n2. 信息使用\n收集的信息仅用于提供个性化育儿指导服务。\n\n3. 信息安全\n我们采用行业标准的加密技术保护您的数据安全。\n\n4. 数据删除\n您可以随时申请删除您的账号和所有相关数据。")
+            }
+        }
+    }
+
+    // MARK: - Terms View
+
+    private func termsView(title: String, content: String) -> some View {
+        NavigationStack {
+            ScrollView {
+                Text(content)
+                    .font(.body)
+                    .padding()
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("关闭") {
+                        showTerms = false
+                        showPrivacy = false
+                    }
+                }
+            }
         }
     }
 

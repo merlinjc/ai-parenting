@@ -19,9 +19,9 @@ public struct VoiceRecordView: View {
     @State private var audioRecorder: AVAudioRecorder?
     @State private var recordingURL: URL?
     @State private var hasRecording = false
-    @State private var timer: Timer?
     @State private var permissionDenied = false
     @State private var isUploading = false
+    @State private var audioSessionError: String?
 
     public init(
         childId: UUID,
@@ -73,6 +73,12 @@ public struct VoiceRecordView: View {
 
                 if permissionDenied {
                     Text("请在系统设置中允许麦克风权限")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                if let audioSessionError {
+                    Text(audioSessionError)
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
@@ -154,7 +160,17 @@ public struct VoiceRecordView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") {
                         stopRecording()
+                        cleanupTempFile()
                         onDismiss()
+                    }
+                }
+            }
+            .task(id: isRecording) {
+                guard isRecording else { return }
+                while !Task.isCancelled && isRecording {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+                    if isRecording {
+                        recordingDuration += 0.1
                     }
                 }
             }
@@ -169,8 +185,10 @@ public struct VoiceRecordView: View {
             try session.setCategory(.playAndRecord, mode: .default)
             try session.setActive(true)
         } catch {
+            audioSessionError = "无法启动录音：\(error.localizedDescription)"
             return
         }
+        audioSessionError = nil
 
         // 检查权限
         switch AVAudioApplication.shared.recordPermission {
@@ -210,13 +228,8 @@ public struct VoiceRecordView: View {
             audioRecorder?.record()
             isRecording = true
             recordingDuration = 0
-
-            // 计时器
-            timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                recordingDuration += 0.1
-            }
         } catch {
-            // 录音启动失败
+            audioSessionError = "录音启动失败：\(error.localizedDescription)"
         }
     }
 
@@ -224,36 +237,47 @@ public struct VoiceRecordView: View {
         audioRecorder?.stop()
         audioRecorder = nil
         isRecording = false
-        timer?.invalidate()
-        timer = nil
         if recordingDuration > 0.5 {
             hasRecording = true
         }
     }
 
     private func resetRecording() {
+        cleanupTempFile()
         hasRecording = false
         recordingDuration = 0
         recordingURL = nil
     }
 
+    /// 清理临时录音文件，避免临时目录积累
+    private func cleanupTempFile() {
+        guard let url = recordingURL else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
     private func saveVoiceRecord() async {
         // 先上传音频文件获取 server URL
-        var voiceUrl = recordingURL?.absoluteString
-        if let localURL = recordingURL, let fileData = try? Data(contentsOf: localURL) {
-            isUploading = true
-            do {
-                let uploadResponse = try await apiClient.uploadFile(
-                    data: fileData,
-                    filename: localURL.lastPathComponent,
-                    mimeType: "audio/mp4"
-                )
-                voiceUrl = uploadResponse.url
-            } catch {
-                // 上传失败时回退到本地路径
-            }
-            isUploading = false
+        guard let localURL = recordingURL, let fileData = try? Data(contentsOf: localURL) else {
+            audioSessionError = "无法读取录音文件"
+            return
         }
+
+        isUploading = true
+        let voiceUrl: String
+        do {
+            let uploadResponse = try await apiClient.uploadFile(
+                data: fileData,
+                filename: localURL.lastPathComponent,
+                mimeType: "audio/mp4"
+            )
+            voiceUrl = uploadResponse.url
+        } catch {
+            // 上传失败时提示用户，不使用本地 file:// 路径保存（其他设备无法访问且临时文件会被清理）
+            isUploading = false
+            audioSessionError = "音频上传失败，请检查网络后重试"
+            return
+        }
+        isUploading = false
 
         let create = RecordCreate(
             childId: childId,

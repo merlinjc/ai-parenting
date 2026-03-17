@@ -7,11 +7,12 @@ lifespan 事件自动建表并插入开发种子数据。
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Callable, Awaitable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -21,17 +22,24 @@ from ai_parenting.backend.config import settings
 from ai_parenting.backend.database import async_session_factory, engine
 from ai_parenting.backend.models import Base
 from ai_parenting.backend.routers import (
+    admin,
+    admin_panel,
     ai_sessions,
     auth,
+    channels,
     children,
     consult_prep,
     devices,
     files,
     home,
+    memory,
     messages,
     plans,
     records,
+    skills,
     users,
+    voice,
+    webhooks,
     weekly_feedbacks,
 )
 from ai_parenting.backend.scheduler import start_scheduler, stop_scheduler
@@ -73,17 +81,81 @@ def create_app() -> FastAPI:
     )
 
     # ---------- CORS 中间件 ----------
+    # P1-10: 生产环境应配置具体域名，开发环境允许所有来源
+    cors_origins = ["*"] if settings.debug or settings.database_url.startswith("sqlite") else [
+        "https://app.aiparenting.com",
+        "https://admin.aiparenting.com",
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 开发环境允许所有来源，生产环境需缩窄
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
+    # ---------- GZip 压缩中间件 (P2-11) ----------
+    from starlette.middleware.gzip import GZipMiddleware
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+    # ---------- P2-12: 请求日志中间件 ----------
+    @app.middleware("http")
+    async def access_log_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        start = time.monotonic()
+        response = await call_next(request)
+        elapsed_ms = int((time.monotonic() - start) * 1000)
+        logger.info(
+            "%s %s %d %dms",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
+        )
+        response.headers["X-Response-Time"] = f"{elapsed_ms}ms"
+        return response
+
+    # ---------- P1-8: API 简易限流中间件 ----------
+    _rate_limit_store: dict[str, list[float]] = {}
+
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        """基于 IP 的简易滑动窗口限流（60 次/分钟通用，AI 接口 10 次/分钟）。"""
+        client_ip = request.client.host if request.client else "unknown"
+        path = request.url.path
+        now = time.monotonic()
+
+        # AI 接口更严格的限流
+        if "/ai/" in path:
+            key = f"{client_ip}:ai"
+            window = 60.0
+            max_requests = 10
+        elif "/auth/login" in path:
+            key = f"{client_ip}:login"
+            window = 60.0
+            max_requests = 5
+        else:
+            key = f"{client_ip}:general"
+            window = 60.0
+            max_requests = 120
+
+        timestamps = _rate_limit_store.get(key, [])
+        # 清除超出窗口的旧请求
+        timestamps = [t for t in timestamps if now - t < window]
+        _rate_limit_store[key] = timestamps
+
+        if len(timestamps) >= max_requests:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests. Please try again later."},
+            )
+
+        timestamps.append(now)
+        _rate_limit_store[key] = timestamps
+        return await call_next(request)
+
     # ---------- 全局异常处理 ----------
     @app.exception_handler(OperationalError)
-    async def db_exception_handler(request: Request, exc: OperationalError):
+    async def db_exception_handler(request: Request, exc: OperationalError) -> JSONResponse:
         logger.error("Database error: %s", exc)
         return JSONResponse(
             status_code=503,
@@ -101,8 +173,17 @@ def create_app() -> FastAPI:
     app.include_router(messages.router, prefix="/api/v1")
     app.include_router(users.router, prefix="/api/v1")
     app.include_router(devices.router, prefix="/api/v1")
+    app.include_router(channels.router, prefix="/api/v1")
+    app.include_router(voice.router, prefix="/api/v1")
+    app.include_router(skills.router, prefix="/api/v1")
     app.include_router(files.router, prefix="/api/v1")
     app.include_router(consult_prep.router, prefix="/api/v1")
+    app.include_router(memory.router, prefix="/api/v1")
+    app.include_router(admin.router, prefix="/api/v1")
+    # Admin 面板（不带 /api/v1 前缀，直接挂载到根路径）
+    app.include_router(admin_panel.router)
+    # Webhooks（不带 /api/v1 前缀，外部平台直接回调）
+    app.include_router(webhooks.router)
 
     # ---------- 静态文件（上传文件访问） ----------
     uploads_dir = Path("uploads")

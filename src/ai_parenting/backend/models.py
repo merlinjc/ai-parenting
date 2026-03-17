@@ -1,8 +1,9 @@
 """SQLAlchemy ORM 模型定义。
 
-基于数据结构草案 V1 定义 9 个领域对象的 ORM 映射：
+基于数据结构草案 V1 定义 12 个领域对象的 ORM 映射：
 User, Device, Child, Record, Plan, DayTask,
-WeeklyFeedback, AISession, Message。
+WeeklyFeedback, AISession, Message,
+ChannelBinding, PushLog, UserChannelPreference。
 
 所有模型使用 UUID 主键，时间戳字段自动管理，
 枚举类型复用 ai_parenting.models.enums 中的定义。
@@ -23,10 +24,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     TypeDecorator,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -131,6 +134,7 @@ class User(Base):
         String(50), nullable=False, default="Asia/Shanghai"
     )
     push_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
@@ -138,13 +142,19 @@ class User(Base):
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    # 关系
-    devices: Mapped[list[Device]] = relationship(back_populates="user", lazy="selectin")
+    # 关系 — 默认 noload，需要时通过 selectinload() 显式加载
+    devices: Mapped[list[Device]] = relationship(back_populates="user", lazy="noload")
     children: Mapped[list[Child]] = relationship(
-        back_populates="user", lazy="selectin"
+        back_populates="user", lazy="noload"
     )
     messages: Mapped[list[Message]] = relationship(
         back_populates="user", lazy="noload"
+    )
+    channel_bindings: Mapped[list[ChannelBinding]] = relationship(
+        back_populates="user", lazy="noload"
+    )
+    channel_preference: Mapped[UserChannelPreference | None] = relationship(
+        back_populates="user", lazy="noload", uselist=False
     )
 
 
@@ -157,6 +167,9 @@ class Device(Base):
     """设备模型 — 推送令牌与设备绑定。"""
 
     __tablename__ = "devices"
+    __table_args__ = (
+        Index("ix_device_user_active", "user_id", "is_active"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -250,6 +263,9 @@ class Record(Base):
     """观察记录模型 — 最高频写入对象。"""
 
     __tablename__ = "records"
+    __table_args__ = (
+        Index("ix_record_child_created", "child_id", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     child_id: Mapped[uuid.UUID] = mapped_column(
@@ -289,6 +305,10 @@ class Plan(Base):
     """微计划模型 — 7 天微计划周期。"""
 
     __tablename__ = "plans"
+    __table_args__ = (
+        Index("ix_plan_child_status", "child_id", "status"),
+        Index("ix_plan_status", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     child_id: Mapped[uuid.UUID] = mapped_column(
@@ -369,6 +389,9 @@ class AISession(Base):
     """AI 会话模型 — 承载 AI 交互完整生命周期。"""
 
     __tablename__ = "ai_sessions"
+    __table_args__ = (
+        Index("ix_ai_session_child_created", "child_id", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     child_id: Mapped[uuid.UUID] = mapped_column(
@@ -438,9 +461,9 @@ class WeeklyFeedback(Base):
     viewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    # 关系
+    # 关系 — plan 默认 noload，需要时通过 selectinload() 显式加载
     child: Mapped[Child] = relationship(back_populates="weekly_feedbacks")
-    plan: Mapped[Plan] = relationship(lazy="selectin")
+    plan: Mapped[Plan] = relationship(lazy="noload")
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +475,9 @@ class Message(Base):
     """消息模型 — 系统向用户发送的触达消息。"""
 
     __tablename__ = "messages"
+    __table_args__ = (
+        Index("ix_message_user_read_created", "user_id", "read_status", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -486,3 +512,144 @@ class Message(Base):
 
     # 关系
     user: Mapped[User] = relationship(back_populates="messages")
+
+
+# ---------------------------------------------------------------------------
+# ChannelBinding（渠道绑定）
+# ---------------------------------------------------------------------------
+
+
+class ChannelBinding(Base):
+    """渠道绑定模型 — 用户与外部消息渠道的绑定关系。
+
+    每个用户可绑定多个渠道（微信、WhatsApp、Telegram、APNs），
+    但同一渠道类型只允许绑定一个（复合唯一约束 user_id + channel）。
+
+    APNs 渠道的 channel_user_id 对应 Device.push_token，
+    通过 device_id 外键关联避免数据冗余。
+    """
+
+    __tablename__ = "channel_bindings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "channel", name="uq_user_channel"),
+        Index("ix_channel_binding_channel_user", "channel", "channel_user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id"), nullable=False
+    )
+    channel: Mapped[str] = mapped_column(
+        String(30), nullable=False
+    )  # apns / wechat / whatsapp / telegram
+    channel_user_id: Mapped[str] = mapped_column(
+        String(500), nullable=False
+    )  # 渠道侧用户标识（openid / phone / push_token）
+    device_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("devices.id"), nullable=True
+    )  # APNs 渠道关联的 Device
+    display_label: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # 用于 UI 展示（如微信昵称）
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # 关系
+    user: Mapped[User] = relationship(back_populates="channel_bindings")
+
+
+# ---------------------------------------------------------------------------
+# PushLog（推送日志）
+# ---------------------------------------------------------------------------
+
+
+class PushLog(Base):
+    """推送日志模型 — 记录每次推送的完整上下文。
+
+    用于推送审计、幂等去重和统计分析。
+    idempotency_key = rule_id + user_id + date 组合，
+    通过唯一索引防止多实例部署下的重复推送。
+    """
+
+    __tablename__ = "push_logs"
+    __table_args__ = (
+        Index("ix_push_log_idempotency", "idempotency_key", unique=True),
+        Index("ix_push_log_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id"), nullable=False
+    )
+    rule_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # SmartPushEngine 规则 ID
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("messages.id"), nullable=True
+    )
+    channel: Mapped[str] = mapped_column(
+        String(30), nullable=False
+    )  # 实际使用的渠道
+    channel_message_id: Mapped[str | None] = mapped_column(
+        String(200), nullable=True
+    )  # 渠道侧消息 ID
+    idempotency_key: Mapped[str] = mapped_column(
+        String(300), nullable=False
+    )  # rule_id + user_id + date
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="sent"
+    )  # sent / delivered / failed / skipped
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fallback_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    fallback_channel: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------------------------
+# UserChannelPreference（用户渠道偏好）
+# ---------------------------------------------------------------------------
+
+
+class UserChannelPreference(Base):
+    """用户渠道偏好模型 — 存储渠道优先级排序和静默时段。
+
+    每个用户一条记录（user_id unique），替代硬编码的"微信 > iOS"优先级。
+    channel_priority 为有序列表，如 ["wechat", "apns", "whatsapp"]。
+    """
+
+    __tablename__ = "user_channel_preferences"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id"), unique=True, nullable=False
+    )
+    channel_priority: Mapped[list] = mapped_column(
+        ArrayType(), nullable=False, default=["apns"]
+    )  # 有序渠道列表
+    quiet_start_hour: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=22
+    )  # 静默开始时（用户本地时间）
+    quiet_end_hour: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=8
+    )  # 静默结束时（用户本地时间）
+    max_daily_pushes: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=5
+    )  # 每日最大推送数
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # 关系
+    user: Mapped[User] = relationship(back_populates="channel_preference")

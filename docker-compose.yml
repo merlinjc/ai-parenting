@@ -1,0 +1,146 @@
+# AI Parenting — Docker Compose 部署配置
+#
+# 编排 FastAPI 后端 + OpenClaw Gateway 同机部署。
+# OpenClaw Gateway 通过 Docker 内部网络与后端 WebSocket 通信（延迟 < 1ms）。
+#
+# 使用方法：
+#   docker compose up -d            # 启动全部服务
+#   docker compose up backend       # 仅启动后端
+#   docker compose logs -f gateway  # 查看 Gateway 日志
+#
+# 环境变量通过 .env 文件配置（不入库）。
+
+services:
+  # =========================================================================
+  # FastAPI 后端
+  # =========================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aip-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      # 数据库
+      - AIP_DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/ai_parenting.db}
+      # AI 模型
+      - AIP_AI_PROVIDER=${AI_PROVIDER:-mock}
+      - AIP_HUNYUAN_API_KEY=${HUNYUAN_API_KEY:-}
+      - AIP_HUNYUAN_BASE_URL=${HUNYUAN_BASE_URL:-}
+      - AIP_HUNYUAN_MODEL=${HUNYUAN_MODEL:-}
+      # 推送渠道
+      - AIP_PUSH_PROVIDER=channel_router
+      - AIP_PUSH_ENGINE_MODE=smart
+      # APNs
+      - AIP_APNS_BUNDLE_ID=${APNS_BUNDLE_ID:-}
+      - AIP_APNS_KEY_PATH=${APNS_KEY_PATH:-}
+      - AIP_APNS_KEY_ID=${APNS_KEY_ID:-}
+      - AIP_APNS_TEAM_ID=${APNS_TEAM_ID:-}
+      - AIP_APNS_USE_SANDBOX=${APNS_USE_SANDBOX:-true}
+      # 微信
+      - AIP_WECHAT_APP_ID=${WECHAT_APP_ID:-}
+      - AIP_WECHAT_APP_SECRET=${WECHAT_APP_SECRET:-}
+      - AIP_WECHAT_TOKEN=${WECHAT_TOKEN:-}
+      - AIP_WECHAT_AES_KEY=${WECHAT_AES_KEY:-}
+      # OpenClaw Gateway — Docker 内部网络互联
+      - AIP_OPENCLAW_WS_URL=ws://gateway:8765
+      - AIP_OPENCLAW_API_KEY=${OPENCLAW_API_KEY:-}
+      # JWT
+      - AIP_JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+    volumes:
+      - backend-data:/app/data
+      - ${APNS_KEY_PATH_HOST:-/dev/null}:/app/certs/apns_key.p8:ro
+    depends_on:
+      gateway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - aip-net
+
+  # =========================================================================
+  # OpenClaw Gateway — WhatsApp/Telegram 多渠道消息网关
+  # =========================================================================
+  gateway:
+    image: node:20-alpine
+    container_name: aip-gateway
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "
+        if [ ! -d node_modules ]; then
+          npm install;
+        fi;
+        node index.js
+      "
+    ports:
+      - "${GATEWAY_WS_PORT:-8765}:8765"
+      - "${GATEWAY_HTTP_PORT:-18789}:18789"
+    environment:
+      # OpenClaw 核心配置
+      - OPENCLAW_PORT=18789
+      - OPENCLAW_WS_PORT=8765
+      - OPENCLAW_API_KEY=${OPENCLAW_API_KEY:-}
+      # WhatsApp (Baileys)
+      - WHATSAPP_ENABLED=${WHATSAPP_ENABLED:-false}
+      - WHATSAPP_SESSION_DIR=/app/data/whatsapp-sessions
+      # Telegram (grammY)
+      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      # Webhook 回调
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://backend:8000/api/v1/webhooks/openclaw}
+      - WEBHOOK_SECRET=${OPENCLAW_API_KEY:-}
+    volumes:
+      - gateway-data:/app/data
+      - ./gateway:/app
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:18789/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - aip-net
+
+  # =========================================================================
+  # PostgreSQL（生产环境）
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: aip-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-ai_parenting}
+      - POSTGRES_USER=${POSTGRES_USER:-aip}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aip}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aip-net
+    profiles:
+      - production
+
+volumes:
+  backend-data:
+    driver: local
+  gateway-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+networks:
+  aip-net:
+    driver: bridge

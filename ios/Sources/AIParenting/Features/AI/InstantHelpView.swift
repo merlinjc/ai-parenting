@@ -134,17 +134,34 @@ public struct InstantHelpView: View {
                     Text("描述一下具体情况")
                         .font(.headline)
 
-                    TextEditor(text: $inputText)
-                        .frame(minHeight: 100)
-                        .padding(8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $inputText)
+                            .frame(minHeight: 100)
+                            .padding(8)
+                            .scrollDismissesKeyboard(.interactively)
+                            .onChange(of: inputText) { _, newValue in
+                                if newValue.count > 500 {
+                                    inputText = String(newValue.prefix(500))
+                                }
+                            }
+
+                        if inputText.isEmpty {
+                            Text("例如：孩子今天在超市突然大哭不止，怎么哄都不行...")
+                                .font(.body)
+                                .foregroundStyle(.tertiary)
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 16)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    )
 
                     Text("\(inputText.count)/500")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(inputText.count >= 480 ? .orange : .secondary)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
 
@@ -299,17 +316,19 @@ public struct InstantHelpView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            // 三步卡片
+            // 三步卡片（安全处理后端返回步骤数超过 3 的情况）
             let stepColors: [Color] = [.blue, .green, .orange]
             let stepIcons = ["1.circle.fill", "2.circle.fill", "3.circle.fill"]
 
-            ForEach(Array(zip(result.steps.indices, result.steps)), id: \.0) { index, step in
+            ForEach(Array(zip(result.steps.prefix(3).indices, result.steps.prefix(3))), id: \.0) { index, step in
                 stepCard(
                     step: step,
                     index: index,
-                    color: stepColors[index],
-                    icon: stepIcons[index],
-                    label: InstantHelpResultContent.stepLabels[index]
+                    color: stepColors[index % stepColors.count],
+                    icon: stepIcons[index % stepIcons.count],
+                    label: index < InstantHelpResultContent.stepLabels.count
+                        ? InstantHelpResultContent.stepLabels[index]
+                        : "步骤 \(index + 1)"
                 )
             }
         }

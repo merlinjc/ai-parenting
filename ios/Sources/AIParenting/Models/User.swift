@@ -47,8 +47,10 @@ public struct UserProfileResponse: Codable, Sendable, Identifiable {
     public let createdAt: Date
     public let updatedAt: Date
     public let children: [ChildResponse]
+    /// 用户已绑定的渠道列表（后端 channel_bindings 字段）
+    public let channelBindings: [ChannelBindingResponse]
 
-    public init(id: UUID, displayName: String?, caregiverRole: String?, timezone: String, pushEnabled: Bool, createdAt: Date, updatedAt: Date, children: [ChildResponse]) {
+    public init(id: UUID, displayName: String?, caregiverRole: String?, timezone: String, pushEnabled: Bool, createdAt: Date, updatedAt: Date, children: [ChildResponse], channelBindings: [ChannelBindingResponse] = []) {
         self.id = id
         self.displayName = displayName
         self.caregiverRole = caregiverRole
@@ -57,6 +59,7 @@ public struct UserProfileResponse: Codable, Sendable, Identifiable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.children = children
+        self.channelBindings = channelBindings
     }
 }
 

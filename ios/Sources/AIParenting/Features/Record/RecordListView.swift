@@ -10,11 +10,12 @@ public struct RecordListView: View {
     @State private var showCreateSheet = false
     public let childId: UUID
 
-    private let filterOptions: [(String?, String)] = [
-        (nil, "全部"),
-        ("quick_check", "快检"),
-        ("event", "事件"),
-        ("voice", "语音"),
+    /// 过滤选项：(filterValue, displayLabel, stableId)
+    private let filterOptions: [(String?, String, String)] = [
+        (nil, "全部", "all"),
+        ("quick_check", "快检", "quick_check"),
+        ("event", "事件", "event"),
+        ("voice", "语音", "voice"),
     ]
 
     public init(childId: UUID) {
@@ -122,7 +123,7 @@ public struct RecordListView: View {
     private func filterBar(_ vm: RecordViewModel) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(filterOptions, id: \.0) { (filter, label) in
+                ForEach(filterOptions, id: \.2) { (filter, label, _) in
                     let isActive = vm.selectedFilter == filter
                     Button {
                         Task { await vm.applyFilter(filter) }

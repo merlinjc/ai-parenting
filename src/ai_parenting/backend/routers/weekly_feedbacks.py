@@ -11,6 +11,7 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_parenting.backend.auth import get_current_user_id
 from ai_parenting.backend.database import get_db, async_session_factory
 from ai_parenting.backend.deps import get_orchestrator
 from ai_parenting.backend.schemas import (
@@ -46,6 +47,7 @@ async def _background_generate(
 async def create_weekly_feedback(
     body: WeeklyFeedbackCreateRequest,
     background_tasks: BackgroundTasks,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
     orchestrator: Orchestrator = Depends(get_orchestrator),
 ):
@@ -72,6 +74,7 @@ async def create_weekly_feedback(
 @router.get("/{feedback_id}", response_model=WeeklyFeedbackResponse)
 async def get_weekly_feedback(
     feedback_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """查询周反馈详情。"""
@@ -84,6 +87,7 @@ async def get_weekly_feedback(
 @router.post("/{feedback_id}/viewed", response_model=WeeklyFeedbackResponse)
 async def mark_feedback_viewed(
     feedback_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """标记周反馈为已查看。"""
@@ -97,6 +101,7 @@ async def mark_feedback_viewed(
 async def submit_feedback_decision(
     feedback_id: uuid.UUID,
     body: WeeklyFeedbackDecisionRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """提交周反馈决策。"""

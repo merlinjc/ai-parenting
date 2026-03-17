@@ -32,23 +32,23 @@ extension Color {
 
     // MARK: - Background
 
-    /// 页面背景
-    public static let appBackground = Color(red: 0.97, green: 0.97, blue: 0.98) // #F7F8FA
+    /// 页面背景（自适应暗色模式）
+    public static let appBackground = Color(.systemGroupedBackground)
 
-    /// 卡片背景
-    public static let appSurface = Color.white
+    /// 卡片背景（自适应暗色模式）
+    public static let appSurface = Color(.secondarySystemGroupedBackground)
 
     /// 浅蓝背景
     public static let appLightBlue = Color(red: 0.94, green: 0.96, blue: 1.0) // #F0F4FF
 
     // MARK: - Text
 
-    /// 主要文本
-    public static let appTextPrimary = Color(red: 0.10, green: 0.10, blue: 0.18) // #1A1A2E
+    /// 主要文本（自适应暗色模式）
+    public static let appTextPrimary = Color(.label)
 
-    /// 次要文本
-    public static let appTextSecondary = Color(red: 0.42, green: 0.45, blue: 0.50) // #6B7280
+    /// 次要文本（自适应暗色模式）
+    public static let appTextSecondary = Color(.secondaryLabel)
 
-    /// 弱化文本
-    public static let appTextTertiary = Color(red: 0.61, green: 0.64, blue: 0.68) // #9CA3AF
+    /// 弱化文本（自适应暗色模式）
+    public static let appTextTertiary = Color(.tertiaryLabel)
 }

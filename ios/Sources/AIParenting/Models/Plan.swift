@@ -42,7 +42,7 @@ public struct DayTaskResponse: Codable, Sendable, Identifiable {
     public let naturalEmbedDescription: String
     public let demoScript: String
     public let observationPoint: String
-    public let completionStatus: String
+    public var completionStatus: String
     public let completedAt: Date?
 
     public init(id: UUID, planId: UUID, dayNumber: Int, mainExerciseTitle: String, mainExerciseDescription: String, naturalEmbedTitle: String, naturalEmbedDescription: String, demoScript: String, observationPoint: String, completionStatus: String, completedAt: Date?) {
@@ -55,7 +55,7 @@ public struct DayTaskResponse: Codable, Sendable, Identifiable {
         self.naturalEmbedDescription = naturalEmbedDescription
         self.demoScript = demoScript
         self.observationPoint = observationPoint
-        self.completionStatus = completionStatus
+        self.completionStatus = completionStatus  // var property for optimistic update
         self.completedAt = completedAt
     }
 }
@@ -84,7 +84,7 @@ public struct PlanResponse: Codable, Sendable, Identifiable {
     public let aiGenerationId: UUID?
     public let createdAt: Date
     public let updatedAt: Date
-    public let dayTasks: [DayTaskResponse]
+    public var dayTasks: [DayTaskResponse]
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)

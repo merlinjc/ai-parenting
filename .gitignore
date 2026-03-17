@@ -35,3 +35,13 @@ ios/DevApp/build/
 # Swift Package Manager
 ios/.build/
 ios/.swiftpm/
+
+# AI coding assistant working directories
+.codebuddy/
+.workbuddy/
+
+# Node modules (admin-dashboard / gateway)
+node_modules/
+
+# Admin dashboard build output
+admin-dashboard/dist/

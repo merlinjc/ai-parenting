@@ -56,46 +56,47 @@ public struct MessageListView: View {
                     .foregroundStyle(.secondary)
             }
         } else {
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    // 未读计数
-                    if vm.totalUnread > 0 {
-                        HStack {
-                            Text("\(vm.totalUnread) 条未读消息")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.blue)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 4)
+            List {
+                // 未读计数
+                if vm.totalUnread > 0 {
+                    HStack {
+                        Text("\(vm.totalUnread) 条未读消息")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.blue)
+                        Spacer()
                     }
-
-                    ForEach(vm.messages) { message in
-                        messageCard(message, vm: vm)
-                            .swipeActions(edge: .trailing) {
-                                if message.readStatus == "unread" {
-                                    Button {
-                                        Task { await vm.markAsRead(message.id) }
-                                    } label: {
-                                        Label("已读", systemImage: "envelope.open")
-                                    }
-                                    .tint(.blue)
-                                }
-                            }
-                    }
-
-                    // 加载更多
-                    if vm.hasMore {
-                        ProgressView()
-                            .padding()
-                            .task {
-                                await vm.loadMore()
-                            }
-                    }
+                    .listRowSeparator(.hidden)
                 }
-                .padding(.vertical, 8)
+
+                ForEach(vm.messages) { message in
+                    messageCard(message, vm: vm)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                        .listRowSeparator(.hidden)
+                        .swipeActions(edge: .trailing) {
+                            if message.readStatus == "unread" {
+                                Button {
+                                    Task { await vm.markAsRead(message.id) }
+                                } label: {
+                                    Label("已读", systemImage: "envelope.open")
+                                }
+                                .tint(.blue)
+                            }
+                        }
+                }
+
+                // 加载更多
+                if vm.hasMore {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .listRowSeparator(.hidden)
+                        .task {
+                            await vm.loadMore()
+                        }
+                }
             }
+            .listStyle(.plain)
             .refreshable {
                 await vm.refresh()
             }
@@ -106,13 +107,16 @@ public struct MessageListView: View {
 
     private func messageCard(_ message: MessageResponse, vm: MessageViewModel) -> some View {
         Button {
+            // 先导航，再异步上报（避免等待网络请求导致点击延迟）
+            navigateToTarget(message)
             Task {
-                await vm.reportClick(message.id)
+                async let reportTask: () = vm.reportClick(message.id)
                 if message.readStatus == "unread" {
-                    await vm.markAsRead(message.id)
+                    async let readTask: () = vm.markAsRead(message.id)
+                    _ = await (reportTask, readTask)
+                } else {
+                    await reportTask
                 }
-                // 根据 targetPage 执行深链导航
-                navigateToTarget(message)
             }
         } label: {
             HStack(alignment: .top, spacing: 12) {
@@ -171,9 +175,8 @@ public struct MessageListView: View {
             .padding(.horizontal)
             .padding(.vertical, 10)
             .background(
-                message.isRiskAlert
-                    ? RoundedRectangle(cornerRadius: 8).fill(.red.opacity(0.04)).eraseToAnyView()
-                    : RoundedRectangle(cornerRadius: 8).fill(.clear).eraseToAnyView()
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(message.isRiskAlert ? Color.red.opacity(0.04) : Color.clear)
             )
         }
         .buttonStyle(.plain)
@@ -189,9 +192,8 @@ public struct MessageListView: View {
         case "plan_detail":
             if let planIdStr = params?.planId, let planId = UUID(uuidString: planIdStr) {
                 appState.navigate(to: .planDetail(planId: planId))
-            } else {
-                appState.navigate(to: .planDetail(planId: UUID()))
             }
+            // 解析失败时不导航，避免用随机 UUID 触发 404
 
         case "record_create":
             appState.navigate(to: .recordCreate(sourcePlanId: nil, sourceSessionId: nil, theme: nil))
@@ -248,13 +250,5 @@ public struct MessageListView: View {
         case "weekly_feedback": return "查看周反馈"
         default: return "查看详情"
         }
-    }
-}
-
-// MARK: - View Type Eraser
-
-extension View {
-    func eraseToAnyView() -> AnyView {
-        AnyView(self)
     }
 }

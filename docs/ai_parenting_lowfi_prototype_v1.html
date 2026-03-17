@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>18—48个月幼儿家长辅助型 AI 产品：低保真页面原型 V1</title>
+  <style>
+    :root {
+      --paper: #f5f1e8;
+      --ink: #181818;
+      --muted: #68645f;
+      --line: #3e3b37;
+      --soft-line: #b6b0a7;
+      --panel: rgba(255,255,255,0.72);
+      --fill: #ded8cf;
+      --fill-dark: #cac3b8;
+      --accent: #111111;
+      --shadow: 0 18px 45px rgba(24, 24, 24, 0.12);
+      --radius: 20px;
+      --phone-radius: 34px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        linear-gradient(rgba(245, 241, 232, 0.96), rgba(245, 241, 232, 0.98)),
+        repeating-linear-gradient(0deg, rgba(62, 59, 55, 0.05) 0, rgba(62, 59, 55, 0.05) 1px, transparent 1px, transparent 28px),
+        repeating-linear-gradient(90deg, rgba(62, 59, 55, 0.05) 0, rgba(62, 59, 55, 0.05) 1px, transparent 1px, transparent 28px);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    body {
+      padding: 32px;
+    }
+
+    .prototype {
+      max-width: 1480px;
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    .paper-card {
+      background: var(--panel);
+      border: 1.5px solid rgba(62, 59, 55, 0.22);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 18px;
+      padding: 22px;
+    }
+
+    .eyebrow,
+    .mono,
+    .chip,
+    .nav-btn,
+    .mini-label,
+    .slot-tag,
+    .dot-label,
+    .flow-step small,
+    .note small,
+    .side-card small {
+      font-family: "Courier New", Courier, monospace;
+      letter-spacing: 0.04em;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    h1, h2, h3, h4, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 1.02;
+      margin-bottom: 12px;
+    }
+
+    .lead {
+      max-width: 720px;
+      font-size: 17px;
+      line-height: 1.72;
+      color: #25221f;
+    }
+
+    .hero-notes {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .note, .side-card {
+      border: 1.5px dashed var(--soft-line);
+      border-radius: 18px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.55);
+    }
+
+    .note strong,
+    .side-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .note p,
+    .side-card p {
+      font-size: 14px;
+      line-height: 1.65;
+      color: #312e2b;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .chip {
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1.5px solid var(--line);
+      font-size: 12px;
+      background: rgba(255,255,255,0.62);
+    }
+
+    .flow-map {
+      padding: 18px 20px 22px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .flow-step {
+      position: relative;
+      min-height: 118px;
+      border-radius: 18px;
+      border: 1.5px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.76), rgba(222,216,207,0.62));
+      padding: 16px 14px;
+      display: grid;
+      align-content: space-between;
+      gap: 12px;
+    }
+
+    .flow-step::after {
+      content: "→";
+      position: absolute;
+      right: -16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 22px;
+    }
+
+    .flow-step:last-child::after { display: none; }
+
+    .flow-step strong {
+      font-size: 18px;
+    }
+
+    .flow-step p {
+      font-size: 14px;
+      line-height: 1.55;
+      color: #322f2b;
+    }
+
+    .flow-step small {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .dock {
+      position: sticky;
+      top: 24px;
+      padding: 18px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .dock h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    .nav-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .nav-btn {
+      width: 100%;
+      border: 1.5px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.75);
+      padding: 13px 14px;
+      text-align: left;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--ink);
+      transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+
+    .nav-btn strong {
+      display: block;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .nav-btn.active,
+    .nav-btn:hover {
+      transform: translateY(-2px);
+      background: rgba(24,24,24,0.88);
+      color: #f8f5ef;
+      box-shadow: 0 14px 28px rgba(24,24,24,0.16);
+    }
+
+    .nav-btn.active strong,
+    .nav-btn:hover strong {
+      color: #ffffff;
+    }
+
+    .canvas {
+      padding: 20px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .screen {
+      display: none;
+      grid-template-columns: minmax(320px, 410px) 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .screen.active {
+      display: grid;
+    }
+
+    .phone {
+      position: relative;
+      width: 100%;
+      background: #fdfcf8;
+      border: 2px solid var(--ink);
+      border-radius: var(--phone-radius);
+      padding: 16px 14px 18px;
+      box-shadow: 0 28px 50px rgba(24,24,24,0.18);
+      overflow: hidden;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 112px;
+      height: 20px;
+      background: var(--ink);
+      border-radius: 0 0 16px 16px;
+      opacity: 0.92;
+    }
+
+    .phone::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.12), transparent 18%, transparent 82%, rgba(24,24,24,0.03));
+      pointer-events: none;
+    }
+
+    .statusbar {
+      margin-top: 18px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      padding: 0 4px 10px;
+    }
+
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 8px 2px 16px;
+      border-bottom: 1.5px dashed var(--soft-line);
+    }
+
+    .topline h4 {
+      font-size: 24px;
+      line-height: 1.08;
+    }
+
+    .topline p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.6;
+    }
+
+    .icon-stack {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-box {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1.5px solid var(--line);
+      background: rgba(255,255,255,0.74);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-family: "Courier New", Courier, monospace;
+    }
+
+    .section-stack {
+      display: grid;
+      gap: 12px;
+      padding-top: 14px;
+    }
+
+    .wire-card {
+      border: 1.5px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.84);
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .wire-card.dashed {
+      border-style: dashed;
+    }
+
+    .wire-card.dark {
+      background: #ece8e0;
+    }
+
+    .wire-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+    }
+
+    .wire-title strong {
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .wire-title span {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-family: "Courier New", Courier, monospace;
+    }
+
+    .wire-card p {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #302d2a;
+    }
+
+    .pill-row,
+    .slot-row,
+    .tabbar,
+    .split-row,
+    .cta-row,
+    .stage-row,
+    .metric-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill,
+    .slot-tag,
+    .mini-box,
+    .cta,
+    .tab-pill,
+    .stage-box,
+    .metric {
+      border: 1.5px solid var(--line);
+      border-radius: 12px;
+      padding: 7px 10px;
+      background: var(--fill);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .pill.invert,
+    .cta.primary,
+    .tab-pill.active {
+      background: var(--ink);
+      color: #f8f5ef;
+    }
+
+    .cta-row { margin-top: 2px; }
+
+    .cta {
+      padding: 9px 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.82);
+      font-family: "Courier New", Courier, monospace;
+    }
+
+    .split-row { align-items: stretch; }
+
+    .split-col {
+      flex: 1 1 120px;
+      border: 1.5px dashed var(--soft-line);
+      border-radius: 14px;
+      padding: 10px;
+      background: rgba(255,255,255,0.62);
+      min-height: 84px;
+    }
+
+    .split-col strong,
+    .side-card strong,
+    .legend-title {
+      font-size: 13px;
+      display: block;
+      margin-bottom: 6px;
+      font-family: "Courier New", Courier, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .split-col p,
+    .side-card p {
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .tabbar {
+      justify-content: space-between;
+      gap: 6px;
+      padding-top: 6px;
+      border-top: 1.5px dashed var(--soft-line);
+    }
+
+    .tab-pill {
+      flex: 1 1 0;
+      text-align: center;
+      background: rgba(255,255,255,0.82);
+      padding: 8px 6px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 11px;
+      border-radius: 14px;
+    }
+
+    .annotation {
+      display: grid;
+      gap: 14px;
+    }
+
+    .annotation h3 {
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .annotation .summary {
+      font-size: 16px;
+      line-height: 1.8;
+      color: #2c2926;
+    }
+
+    .annotation-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .side-card {
+      min-height: 116px;
+    }
+
+    .dot-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .dot-item {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 8px;
+      align-items: start;
+      font-size: 14px;
+      line-height: 1.65;
+      color: #2d2a27;
+    }
+
+    .dot-label {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1.5px solid var(--line);
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      background: rgba(255,255,255,0.88);
+      margin-top: 2px;
+    }
+
+    .mini-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .ghost-lines {
+      display: grid;
+      gap: 8px;
+    }
+
+    .ghost-line {
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #beb8ad, #d7d0c4);
+    }
+
+    .ghost-line.short { width: 64%; }
+    .ghost-line.mid { width: 82%; }
+    .ghost-line.tiny { width: 42%; }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 10px 0;
+      border-top: 1px dashed var(--soft-line);
+    }
+
+    .timeline-item:first-child { border-top: 0; padding-top: 0; }
+
+    .time-box {
+      border: 1.5px solid var(--line);
+      border-radius: 12px;
+      padding: 7px 8px;
+      text-align: center;
+      font-size: 11px;
+      background: rgba(255,255,255,0.8);
+      font-family: "Courier New", Courier, monospace;
+    }
+
+    .detail-box {
+      border: 1.5px dashed var(--soft-line);
+      border-radius: 14px;
+      padding: 10px;
+      background: rgba(255,255,255,0.58);
+    }
+
+    .detail-box strong { font-size: 14px; display: block; margin-bottom: 4px; }
+    .detail-box p { font-size: 12px; line-height: 1.6; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .metric {
+      background: rgba(255,255,255,0.82);
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 4px;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .footer-note {
+      padding: 14px 18px 20px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    @media (max-width: 1200px) {
+      .hero,
+      .workspace,
+      .screen,
+      .annotation-grid,
+      .flow-row {
+        grid-template-columns: 1fr;
+      }
+
+      .dock {
+        position: static;
+      }
+
+      .flow-step::after {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="prototype">
+    <section class="hero paper-card">
+      <div>
+        <div class="eyebrow">Low-Fidelity Prototype / iOS Parent App / V1</div>
+        <h1>18—48个月幼儿家长辅助型 AI 产品<br />低保真页面原型 V1</h1>
+        <p class="lead">
+          这一版原型把已经稳定的页面信息架构继续往前推进一步，转成可以直接评审的线框级页面骨架。整个原型坚持
+          <strong>灰阶、低装饰、强结构</strong> 的表达方式，重点验证三件事：
+          <strong>首页是不是状态页、计划页是不是行动页、记录与消息能否真正把主闭环接起来。</strong>
+        </p>
+        <div class="legend">
+          <span class="chip">主任务页：首页 / 计划 / 记录</span>
+          <span class="chip">辅助入口：即时求助 / 消息 / 设置</span>
+          <span class="chip">主闭环：计划执行 → 记录留证 → 反馈回流</span>
+          <span class="chip">原则：AI 不是主 Tab</span>
+        </div>
+      </div>
+      <div class="hero-notes">
+        <div class="note">
+          <strong>为什么先做低保真</strong>
+          <p>当前目标不是确认视觉风格，而是先验证页面职责边界、主导航层级、回流路径与上下文入口是否清楚。只要结构成立，后续高保真和字段设计都会更稳。</p>
+        </div>
+        <div class="note">
+          <strong>本轮覆盖范围</strong>
+          <p>进入层、首页、计划页、记录页、即时求助页、消息中心与周反馈回流，均按 iOS 家长端场景组织，但仍保持文档级与线框级颗粒度。</p>
+        </div>
+        <div class="note">
+          <strong>本轮不验证内容</strong>
+          <p>颜色品牌、最终文案、动效、插画、详细组件状态、接口字段与多角色协同机制，仍留到下一轮细化。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="flow-map paper-card">
+      <div class="eyebrow">Primary Loop</div>
+      <h2>页面主闭环：从进入，到行动，到证据，再到回流</h2>
+      <div class="flow-row">
+        <div class="flow-step">
+          <small>Step 01</small>
+          <strong>进入层</strong>
+          <p>登录、建立儿童基础信息、完成最小阶段判断，先让首页不再是空白页。</p>
+        </div>
+        <div class="flow-step">
+          <small>Step 02</small>
+          <strong>首页判断</strong>
+          <p>家长快速判断本周焦点、今天先做什么，以及是否存在消息或反馈回流。</p>
+        </div>
+        <div class="flow-step">
+          <small>Step 03</small>
+          <strong>计划执行</strong>
+          <p>进入 7 天微计划与当日任务详情，完成今天最值得做的一个动作。</p>
+        </div>
+        <div class="flow-step">
+          <small>Step 04</small>
+          <strong>记录留证</strong>
+          <p>用轻量打点、事件记录或语音补充，把发生过的事实稳定回写给系统。</p>
+        </div>
+        <div class="flow-step">
+          <small>Step 05</small>
+          <strong>反馈 / 求助</strong>
+          <p>系统基于记录生成反馈；高压场景则走即时求助，不把 AI 变成独立聊天中心。</p>
+        </div>
+        <div class="flow-step">
+          <small>Step 06</small>
+          <strong>消息回流</strong>
+          <p>推送和消息把家长带回计划、记录或周反馈页，形成下一轮执行闭环。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <aside class="dock paper-card">
+        <div>
+          <div class="eyebrow">Screen Navigator</div>
+          <h3>原型页面</h3>
+          <p class="lead" style="font-size:14px; line-height:1.7; max-width:none;">点击左侧按钮切换页面。每个页面右侧都说明其职责、前后跳转与应回写的关键状态。</p>
+        </div>
+        <div class="nav-stack">
+          <button class="nav-btn active" data-target="screen-onboarding"><strong>进入层</strong>首次进入与最小上下文建立</button>
+          <button class="nav-btn" data-target="screen-home"><strong>首页</strong>状态判断与回流汇总</button>
+          <button class="nav-btn" data-target="screen-plan"><strong>计划页</strong>7 天计划与当日行动主场</button>
+          <button class="nav-btn" data-target="screen-record"><strong>记录页</strong>轻量打点、事件留证与周回顾</button>
+          <button class="nav-btn" data-target="screen-help"><strong>即时求助</strong>场景化 AI 支持，而不是聊天首页</button>
+          <button class="nav-btn" data-target="screen-message"><strong>消息回流</strong>推送、反馈与任务回流中枢</button>
+          <button class="nav-btn" data-target="screen-feedback"><strong>周反馈</strong>计划链路延展页与下周决策入口</button>
+        </div>
+        <div class="side-card">
+          <strong>结构判断</strong>
+          <p>本原型默认采用底部三 Tab：首页、计划、记录。即时求助和消息都保留为上下文入口，以避免误导产品重心。</p>
+        </div>
+      </aside>
+
+      <section class="canvas paper-card">
+        <article class="screen active" id="screen-onboarding">
+          <div class="phone">
+            <div class="statusbar"><span>9:41</span><span>Low-Fi / Onboarding</span></div>
+            <div class="topline">
+              <div>
+                <h4>欢迎回来</h4>
+                <p>先建立最小上下文，再进入首页</p>
+              </div>
+              <div class="icon-stack">
+                <div class="icon-box">A</div>
+              </div>
+            </div>
+            <div class="section-stack">
+              <div class="wire-card dark">
+                <div class="wire-title"><strong>Step 1 / 登录或注册</strong><span>必填</span></div>
+                <div class="ghost-lines">
+                  <div class="ghost-line mid"></div>
+                  <div class="ghost-line short"></div>
+                </div>
+                <div class="cta-row">
+                  <span class="cta primary">手机号登录</span>
+                  <span class="cta">邮箱 / 第三方</span>
+                </div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>Step 2 / 儿童基础信息</strong><span>必填</span></div>
+                <div class="pill-row">
+                  <span class="pill">出生年月</span>
+                  <span class="pill">昵称</span>
+                  <span class="pill">主要照护关系</span>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>Step 3 / 初始阶段问答</strong><span>必填</span></div>
+                <div class="split-row">
+                  <div class="split-col"><strong>当前关注</strong><p>语言表达少 / 转场困难 / 回应少</p></div>
+                  <div class="split-col"><strong>近况一句话</strong><p>最近更容易在换衣服时哭闹</p></div>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>Step 4 / 可延后项</strong><span>非阻断</span></div>
+                <div class="pill-row">
+                  <span class="pill">高压场景补充</span>
+                  <span class="pill">常见作息</span>
+                  <span class="pill">通知授权</span>
+                </div>
+                <div class="cta-row">
+                  <span class="cta primary">进入首页</span>
+                  <span class="cta">稍后补充</span>
+                </div>
+              </div>
+              <div class="tabbar">
+                <span class="tab-pill active">进入层</span>
+                <span class="tab-pill">首页</span>
+                <span class="tab-pill">计划</span>
+              </div>
+            </div>
+          </div>
+          <div class="annotation">
+            <div>
+              <div class="eyebrow">Screen / 01</div>
+              <h3>进入层：先让首页可用，而不是先收集一切</h3>
+            </div>
+            <p class="summary">这个页面要验证的不是品牌欢迎感，而是首次进入门槛是否足够低。账户建立、儿童基础信息与初始阶段判断是进入首页的最小前提；高压场景补充和通知授权可以延后，避免把第一次进入变成冗长表单。</p>
+            <div class="annotation-grid">
+              <div class="side-card">
+                <strong>进入来自</strong>
+                <p>冷启动、未登录、首次安装、会话失效重进。</p>
+              </div>
+              <div class="side-card">
+                <strong>离开去向</strong>
+                <p>完成最小上下文后直接进入首页；其余资料进入后再补。</p>
+              </div>
+              <div class="side-card">
+                <strong>关键验证点</strong>
+                <p>首页第一次出现时是否已经具备阶段、焦点与初始任务，不会出现空白状态。</p>
+              </div>
+              <div class="side-card">
+                <strong>需要回写</strong>
+                <p>用户身份、儿童档案、阶段初判、是否已看过通知授权说明。</p>
+              </div>
+            </div>
+            <div class="dot-list">
+              <div class="dot-item"><span class="dot-label">1</span><span>进入层不是 onboarding 展示页，而是首页信息成立的前提页。</span></div>
+              <div class="dot-item"><span class="dot-label">2</span><span>通知权限被放到价值解释之后，而不是冷启动第一步。</span></div>
+              <div class="dot-item"><span class="dot-label">3</span><span>“进入首页”按钮被明确放在最小必填项之后，验证首轮转化是否顺滑。</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen" id="screen-home">
+          <div class="phone">
+            <div class="statusbar"><span>9:41</span><span>Home / Status</span></div>
+            <div class="topline">
+              <div>
+                <h4>小北 · 26个月</h4>
+                <p>首页是状态页，不展开完整执行细节</p>
+              </div>
+              <div class="icon-stack">
+                <div class="icon-box">MSG</div>
+                <div class="icon-box">ME</div>
+              </div>
+            </div>
+            <div class="section-stack">
+              <div class="wire-card dark">
+                <div class="wire-title"><strong>当前周焦点</strong><span>主卡</span></div>
+                <div class="pill-row">
+                  <span class="pill invert">阶段：24—36个月</span>
+                  <span class="pill">主题：过渡与共同调节</span>
+                  <span class="pill">状态：重点关注</span>
+                </div>
+                <p>本周建议先稳定“换衣 / 出门”前的预告节奏，再观察哭闹是否缩短。</p>
+                <div class="cta-row">
+                  <span class="cta primary">查看本周计划</span>
+                  <span class="cta">查看阶段说明</span>
+                </div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>今日任务</strong><span>判断 → 跳转</span></div>
+                <div class="split-row">
+                  <div class="split-col"><strong>主练习</strong><p>换衣前预告一次，再留 3 秒。</p></div>
+                  <div class="split-col"><strong>自然嵌入</strong><p>出门前重复“先穿鞋，再出门”。</p></div>
+                </div>
+                <div class="cta-row"><span class="cta primary">去执行</span></div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>最近记录摘要</strong><span>已回写</span></div>
+                <p>今天已留 1 条记录：换衣哭闹时间比昨天短一些。</p>
+                <div class="pill-row">
+                  <span class="pill">影响本周计划理解</span>
+                  <span class="pill">已同步到记录页</span>
+                </div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>待处理回流</strong><span>摘要，不是全量消息</span></div>
+                <p>周反馈已生成；另有 1 条“补一条记录”的提醒未处理。</p>
+                <div class="cta-row">
+                  <span class="cta primary">查看周反馈</span>
+                  <span class="cta">打开消息中心</span>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>即时求助</strong><span>上下文入口</span></div>
+                <p>现在不知道怎么回应时，可直接带着当前计划与最近记录进入求助。</p>
+                <div class="cta-row"><span class="cta primary">现在怎么办？</span></div>
+              </div>
+              <div class="tabbar">
+                <span class="tab-pill active">首页</span>
+                <span class="tab-pill">计划</span>
+                <span class="tab-pill">记录</span>
+              </div>
+            </div>
+          </div>
+          <div class="annotation">
+            <div>
+              <div class="eyebrow">Screen / 02</div>
+              <h3>首页：状态判断页，而不是完整执行页</h3>
+            </div>
+            <p class="summary">首页只做四件事：告诉家长当前阶段与焦点、今天先做什么、最近记录是否影响理解、有没有需要处理的消息或反馈。它负责判断与跳转，不负责承载完整任务细节，因此“去执行”会落到计划页，“查看周反馈”会落到反馈详情页。</p>
+            <div class="annotation-grid">
+              <div class="side-card">
+                <strong>进入来自</strong>
+                <p>首次进入成功后默认落地页；日常冷启动主入口；消息深链回退后的聚合页。</p>
+              </div>
+              <div class="side-card">
+                <strong>离开去向</strong>
+                <p>计划页、消息中心、周反馈页、即时求助页、档案与设置页。</p>
+              </div>
+              <div class="side-card">
+                <strong>关键验证点</strong>
+                <p>用户是否在 5 秒内理解“今天做什么”，而不是被内容流淹没。</p>
+              </div>
+              <div class="side-card">
+                <strong>需要回写</strong>
+                <p>当前计划是否已查看、待处理项是否已点击、求助入口是否带入上下文。</p>
+              </div>
+            </div>
+            <div class="dot-list">
+              <div class="dot-item"><span class="dot-label">1</span><span>首页中的“待处理回流”只是摘要卡，不替代完整消息中心。</span></div>
+              <div class="dot-item"><span class="dot-label">2</span><span>首页出现“去执行”而不是“直接勾选完成”，用来强化计划页才是行动主场。</span></div>
+              <div class="dot-item"><span class="dot-label">3</span><span>即时求助入口保留高可达，但仍然依附于当下任务与上下文，不升级为第四个主 Tab。</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen" id="screen-plan">
+          <div class="phone">
+            <div class="statusbar"><span>9:41</span><span>Plan / Action</span></div>
+            <div class="topline">
+              <div>
+                <h4>7 天微计划</h4>
+                <p>计划页是完整行动页</p>
+              </div>
+              <div class="icon-stack">
+                <div class="icon-box">WK</div>
+              </div>
+            </div>
+            <div class="section-stack">
+              <div class="wire-card dark">
+                <div class="wire-title"><strong>本周主线</strong><span>Day 3 / 7</span></div>
+                <p>主目标：让换衣和出门前的过渡更可预期，减少突然切换引发的升级。</p>
+                <div class="stage-row">
+                  <span class="stage-box">优先场景：换衣</span>
+                  <span class="stage-box">优先场景：出门</span>
+                  <span class="stage-box">焦点：过渡预告</span>
+                </div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>Day 3 当日任务</strong><span>完整执行区</span></div>
+                <div class="split-row">
+                  <div class="split-col"><strong>主练习</strong><p>换衣前说“再玩一次，我们就换衣”，停 3 秒再开始。</p></div>
+                  <div class="split-col"><strong>自然嵌入</strong><p>出门前重复“先穿鞋，再出门”。</p></div>
+                </div>
+                <div class="split-row">
+                  <div class="split-col"><strong>示范话术</strong><p>“你还想玩，我知道。再玩一次，我们就去穿鞋。”</p></div>
+                  <div class="split-col"><strong>观察点</strong><p>是否更快进入下一步；是否需要更少的身体协助。</p></div>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>完成与复盘</strong><span>写状态</span></div>
+                <div class="pill-row">
+                  <span class="pill">已执行</span>
+                  <span class="pill">部分顺利</span>
+                  <span class="pill">需要补记</span>
+                </div>
+                <div class="cta-row">
+                  <span class="cta primary">完成后去记录</span>
+                  <span class="cta">现在求助</span>
+                </div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>周反馈与历史</strong><span>延展页</span></div>
+                <div class="cta-row">
+                  <span class="cta">查看本周反馈</span>
+                  <span class="cta">查看历次计划</span>
+                </div>
+              </div>
+              <div class="tabbar">
+                <span class="tab-pill">首页</span>
+                <span class="tab-pill active">计划</span>
+                <span class="tab-pill">记录</span>
+              </div>
+            </div>
+          </div>
+          <div class="annotation">
+            <div>
+              <div class="eyebrow">Screen / 03</div>
+              <h3>计划页：把“这一周具体怎么做”讲清楚</h3>
+            </div>
+            <p class="summary">计划页不该像课程页，也不该像纯打卡页。它需要把主目标、优先场景、当日动作、示范话术、观察点和完成状态放在同一页面体系里，让家长感到自己在执行一个连续支持路径，而不是孤立点击“完成”。</p>
+            <div class="annotation-grid">
+              <div class="side-card">
+                <strong>进入来自</strong>
+                <p>首页“去执行”、消息提醒、周反馈中的回看入口、计划历史回跳。</p>
+              </div>
+              <div class="side-card">
+                <strong>离开去向</strong>
+                <p>记录页、即时求助页、周反馈详情、计划历史。</p>
+              </div>
+              <div class="side-card">
+                <strong>关键验证点</strong>
+                <p>用户能否在一个页面里看到动作、话术、观察点与完成入口，而不需要来回找信息。</p>
+              </div>
+              <div class="side-card">
+                <strong>需要回写</strong>
+                <p>当日任务完成状态、是否顺利、是否已转去记录、是否从此页发起求助。</p>
+              </div>
+            </div>
+            <div class="dot-list">
+              <div class="dot-item"><span class="dot-label">1</span><span>“完成后去记录”是关键桥梁，用来验证计划 → 记录是否真连得起来。</span></div>
+              <div class="dot-item"><span class="dot-label">2</span><span>“现在求助”放在完成面板旁边，说明求助是执行中的辅助动作，而不是另一条并行主线。</span></div>
+              <div class="dot-item"><span class="dot-label">3</span><span>周反馈被当作计划链路延展页，而不是孤立内容页。</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen" id="screen-record">
+          <div class="phone">
+            <div class="statusbar"><span>9:41</span><span>Record / Evidence</span></div>
+            <div class="topline">
+              <div>
+                <h4>记录</h4>
+                <p>快速留下事实，再由系统归档</p>
+              </div>
+              <div class="icon-stack">
+                <div class="icon-box">MIC</div>
+              </div>
+            </div>
+            <div class="section-stack">
+              <div class="wire-card dark">
+                <div class="wire-title"><strong>快速打点</strong><span>最快入口</span></div>
+                <div class="pill-row">
+                  <span class="pill">今天完成了计划动作</span>
+                  <span class="pill">哭闹缩短一些</span>
+                  <span class="pill">仍然很难转场</span>
+                </div>
+                <div class="cta-row"><span class="cta primary">一键提交</span></div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>关键事件记录</strong><span>一句话留证</span></div>
+                <div class="ghost-lines">
+                  <div class="ghost-line mid"></div>
+                  <div class="ghost-line short"></div>
+                </div>
+                <div class="pill-row">
+                  <span class="pill">场景：换衣</span>
+                  <span class="pill">时间：晚饭后</span>
+                  <span class="pill">主题：过渡</span>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>语音补充</strong><span>低负担</span></div>
+                <p>适合描述复杂场景，后端转写后自动归档。</p>
+                <div class="cta-row">
+                  <span class="cta primary">开始录音</span>
+                  <span class="cta">改为文字</span>
+                </div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>最近记录时间线</strong><span>回看</span></div>
+                <div class="timeline">
+                  <div class="timeline-item">
+                    <div class="time-box">今天<br />18:20</div>
+                    <div class="detail-box"><strong>换衣前先预告，哭闹时间短一些</strong><p>已同步到计划页，影响本周判断。</p></div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="time-box">昨天<br />08:10</div>
+                    <div class="detail-box"><strong>出门时仍需要抱离现场</strong><p>建议继续观察转场升级前的预警信号。</p></div>
+                  </div>
+                </div>
+              </div>
+              <div class="tabbar">
+                <span class="tab-pill">首页</span>
+                <span class="tab-pill">计划</span>
+                <span class="tab-pill active">记录</span>
+              </div>
+            </div>
+          </div>
+          <div class="annotation">
+            <div>
+              <div class="eyebrow">Screen / 04</div>
+              <h3>记录页：证据输入页，而不是复杂表单页</h3>
+            </div>
+            <p class="summary">记录页的重点是把“刚刚发生了什么”用最低负担留住，再让系统在后台完成结构化。这里故意把快速打点放在最上方，而把复杂分类隐藏到二层或后台处理，以验证家长是否更愿意留下连续证据。</p>
+            <div class="annotation-grid">
+              <div class="side-card">
+                <strong>进入来自</strong>
+                <p>计划页“完成后去记录”、首页“先补一条记录”、消息中的记录提醒。</p>
+              </div>
+              <div class="side-card">
+                <strong>离开去向</strong>
+                <p>提交后回首页或计划页；也可以继续去即时求助页。</p>
+              </div>
+              <div class="side-card">
+                <strong>关键验证点</strong>
+                <p>用户是否能在 10 秒内留下一条轻量记录；时间线是否让“记录确实有价值”变得可见。</p>
+              </div>
+              <div class="side-card">
+                <strong>需要回写</strong>
+                <p>新记录条目、主题聚合、计划页已有关联证据、首页摘要已刷新。</p>
+              </div>
+            </div>
+            <div class="dot-list">
+              <div class="dot-item"><span class="dot-label">1</span><span>记录页优先承接“已发生的事实”，不优先承接“我现在该怎么办”。</span></div>
+              <div class="dot-item"><span class="dot-label">2</span><span>语音入口被保留，是为了让高压家庭仍能低负担留下复杂情况。</span></div>
+              <div class="dot-item"><span class="dot-label">3</span><span>时间线中的“已同步到计划页”文案，用于强化记录会影响后续建议，而非沉底消失。</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen" id="screen-help">
+          <div class="phone">
+            <div class="statusbar"><span>9:41</span><span>Help / AI in Context</span></div>
+            <div class="topline">
+              <div>
+                <h4>现在怎么办？</h4>
+                <p>AI 是场景化支持，不是独立主导航</p>
+              </div>
+              <div class="icon-stack">
+                <div class="icon-box">CTX</div>
+              </div>
+            </div>
+            <div class="section-stack">
+              <div class="wire-card dark">
+                <div class="wire-title"><strong>常见问题场景</strong><span>优先入口</span></div>
+                <div class="pill-row">
+                  <span class="pill">转场崩溃</span>
+                  <span class="pill">不肯开口说</span>
+                  <span class="pill">见人就躲</span>
+                  <span class="pill">总是抢回合</span>
+                </div>
+                <div class="ghost-lines">
+                  <div class="ghost-line mid"></div>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>系统已引用的上下文</strong><span>透明化</span></div>
+                <div class="pill-row">
+                  <span class="pill">年龄：26个月</span>
+                  <span class="pill">当前计划：过渡预告</span>
+                  <span class="pill">最近记录：换衣哭闹缩短</span>
+                </div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>AI 三步支持</strong><span>结构化结果卡</span></div>
+                <div class="split-row">
+                  <div class="split-col"><strong>先说什么</strong><p>“你还想玩，我知道。再玩一次，我们去穿鞋。”</p></div>
+                  <div class="split-col"><strong>接着做什么</strong><p>停 3 秒，再给一个固定动作提示。</p></div>
+                </div>
+                <div class="split-row">
+                  <div class="split-col"><strong>如果没接住</strong><p>先降回一句短预告，不连续讲道理，再看是否需要抱持协助。</p></div>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>后续动作</strong><span>必须回流</span></div>
+                <div class="cta-row">
+                  <span class="cta primary">补记为记录</span>
+                  <span class="cta">加入本周关注</span>
+                  <span class="cta">查看咨询准备建议</span>
+                </div>
+              </div>
+              <div class="tabbar">
+                <span class="tab-pill">首页</span>
+                <span class="tab-pill">计划</span>
+                <span class="tab-pill active">上下文 AI</span>
+              </div>
+            </div>
+          </div>
+          <div class="annotation">
+            <div>
+              <div class="eyebrow">Screen / 05</div>
+              <h3>即时求助：把 AI 固定为“从问题到动作”的缩短器</h3>
+            </div>
+            <p class="summary">这个页面有意避免聊天气泡流，而是把输入、上下文、结果与后续动作组织成结构化卡片。这样可以验证：用户在高压时刻是不是更需要一个明确答案结构，而不是一段会不断展开的开放式聊天。</p>
+            <div class="annotation-grid">
+              <div class="side-card">
+                <strong>进入来自</strong>
+                <p>首页快捷入口、计划页执行中卡住、记录页提交后的延伸入口。</p>
+              </div>
+              <div class="side-card">
+                <strong>离开去向</strong>
+                <p>记录页、计划页、咨询准备页；结果可回写下周关注点。</p>
+              </div>
+              <div class="side-card">
+                <strong>关键验证点</strong>
+                <p>用户是否能快速理解 AI 引用了哪些上下文，并能将结果继续带回系统，而不是停留在聊天里。</p>
+              </div>
+              <div class="side-card">
+                <strong>需要回写</strong>
+                <p>新会话对象、结果是否标记为记录、是否提升为周关注、是否触发更保守路径。</p>
+              </div>
+            </div>
+            <div class="dot-list">
+              <div class="dot-item"><span class="dot-label">1</span><span>AI 结果被压缩成“先说什么 / 接着做什么 / 没接住怎么办”三段，是为了匹配高压时刻的阅读心智。</span></div>
+              <div class="dot-item"><span class="dot-label">2</span><span>上下文卡被显式展示，验证家长是否更信任“带着阶段与记录来的 AI”。</span></div>
+              <div class="dot-item"><span class="dot-label">3</span><span>底部三个后续动作全部是回流动作，避免求助结果悬空。</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen" id="screen-message">
+          <div class="phone">
+            <div class="statusbar"><span>9:41</span><span>Message / Return</span></div>
+            <div class="topline">
+              <div>
+                <h4>消息中心</h4>
+                <p>全量消息列表，不等于首页待处理摘要</p>
+              </div>
+              <div class="icon-stack">
+                <div class="icon-box">4</div>
+              </div>
+            </div>
+            <div class="section-stack">
+              <div class="wire-card dark">
+                <div class="wire-title"><strong>未处理优先</strong><span>按回流目标组织</span></div>
+                <div class="timeline">
+                  <div class="timeline-item">
+                    <div class="time-box">今日<br />08:30</div>
+                    <div class="detail-box"><strong>去完成 Day 3 当日任务</strong><p>点击后深链至计划页 / 当日任务详情。</p></div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="time-box">昨日<br />21:10</div>
+                    <div class="detail-box"><strong>周反馈已生成</strong><p>点击后进入周反馈详情，而不是只看消息正文。</p></div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="time-box">昨日<br />18:40</div>
+                    <div class="detail-box"><strong>请补一条转场记录</strong><p>点击后深链到记录页快速录入区。</p></div>
+                  </div>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>消息详情预览</strong><span>示例</span></div>
+                <p>“今天的过渡预告还没完成。现在去看 Day 3 动作，预计只需 3 分钟。”</p>
+                <div class="cta-row">
+                  <span class="cta primary">去计划页</span>
+                  <span class="cta">标记已处理</span>
+                </div>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>处理状态</strong><span>不是用户主关注，但要存在</span></div>
+                <div class="kpi-grid">
+                  <div class="metric"><strong>2</strong><span>未读</span></div>
+                  <div class="metric"><strong>1</strong><span>已深链</span></div>
+                  <div class="metric"><strong>1</strong><span>待补记</span></div>
+                </div>
+              </div>
+              <div class="tabbar">
+                <span class="tab-pill">首页摘要</span>
+                <span class="tab-pill active">消息中心</span>
+                <span class="tab-pill">深链目标页</span>
+              </div>
+            </div>
+          </div>
+          <div class="annotation">
+            <div>
+              <div class="eyebrow">Screen / 06</div>
+              <h3>消息中心：把“提醒”翻译成明确的回流动作</h3>
+            </div>
+            <p class="summary">消息中心不是为了堆通知数量，而是为了把用户带回正确页面。因此这里所有消息都按回流目标组织：去计划、去记录、去反馈、去咨询准备。首页只摘取最需要处理的 1—2 项，而完整状态留在消息中心维护。</p>
+            <div class="annotation-grid">
+              <div class="side-card">
+                <strong>进入来自</strong>
+                <p>首页消息按钮、推送通知点击、系统站内提醒列表。</p>
+              </div>
+              <div class="side-card">
+                <strong>离开去向</strong>
+                <p>计划页、记录页、周反馈页、咨询准备页。</p>
+              </div>
+              <div class="side-card">
+                <strong>关键验证点</strong>
+                <p>用户是否能一眼判断“这条消息要我做什么”，而不是阅读一段抽象提醒。</p>
+              </div>
+              <div class="side-card">
+                <strong>需要回写</strong>
+                <p>已读、已点击、是否深链到达、是否处理完成，用于后续提醒优化。</p>
+              </div>
+            </div>
+            <div class="dot-list">
+              <div class="dot-item"><span class="dot-label">1</span><span>消息详情里的主按钮直接指向目标页，而不是只打开消息正文。</span></div>
+              <div class="dot-item"><span class="dot-label">2</span><span>“标记已处理”被保留，是为了验证消息处理与任务完成并不总是同一动作。</span></div>
+              <div class="dot-item"><span class="dot-label">3</span><span>处理状态被弱化显示，前台只保留必要信息，避免把消息页做成运营面板。</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen" id="screen-feedback">
+          <div class="phone">
+            <div class="statusbar"><span>9:41</span><span>Feedback / Weekly Summary</span></div>
+            <div class="topline">
+              <div>
+                <h4>本周反馈</h4>
+                <p>计划链路延展页，可被首页与消息深链唤起</p>
+              </div>
+              <div class="icon-stack">
+                <div class="icon-box">RPT</div>
+              </div>
+            </div>
+            <div class="section-stack">
+              <div class="wire-card dark">
+                <div class="wire-title"><strong>本周积极变化</strong><span>先看变化</span></div>
+                <p>在换衣和出门前加入预告后，哭闹升级前的缓冲时间变长了，家长更容易接住第一轮情绪。</p>
+              </div>
+              <div class="wire-card">
+                <div class="wire-title"><strong>仍需多给机会</strong><span>下一步判断</span></div>
+                <p>在外出转场时仍有较强身体协助需求，建议继续观察“预告后到动作开始”的过渡窗口。</p>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>下周建议</strong><span>决策区</span></div>
+                <div class="pill-row">
+                  <span class="pill">继续同焦点</span>
+                  <span class="pill">降低难度</span>
+                  <span class="pill">换焦点</span>
+                </div>
+                <div class="cta-row">
+                  <span class="cta primary">继续这一周主线</span>
+                  <span class="cta">回看计划与记录</span>
+                </div>
+              </div>
+              <div class="wire-card dashed">
+                <div class="wire-title"><strong>更保守的下一步</strong><span>边界说明</span></div>
+                <p>如果多场景持续升级、恢复明显变慢，转去咨询准备页，而不是继续加码训练。</p>
+              </div>
+              <div class="tabbar">
+                <span class="tab-pill">计划</span>
+                <span class="tab-pill active">周反馈</span>
+                <span class="tab-pill">下周决策</span>
+              </div>
+            </div>
+          </div>
+          <div class="annotation">
+            <div>
+              <div class="eyebrow">Screen / 07</div>
+              <h3>周反馈：让“记录影响建议”在页面上真正可见</h3>
+            </div>
+            <p class="summary">周反馈页要验证的是：家长是否真的看见系统吸收了这一周的记录与执行结果，并据此给出下一步，而不是吐出一段通用总结。它在信息架构上属于计划链路延展页，但可从首页与消息中心直接深链进入。</p>
+            <div class="annotation-grid">
+              <div class="side-card">
+                <strong>进入来自</strong>
+                <p>首页待处理回流卡、消息“周反馈已生成”、计划页的周反馈入口。</p>
+              </div>
+              <div class="side-card">
+                <strong>离开去向</strong>
+                <p>下周计划、计划历史、记录页、咨询准备页。</p>
+              </div>
+              <div class="side-card">
+                <strong>关键验证点</strong>
+                <p>用户能否在这里清楚理解：哪些变化值得继续，哪些边界意味着应该转向更保守路径。</p>
+              </div>
+              <div class="side-card">
+                <strong>需要回写</strong>
+                <p>反馈是否已查看、是否选择继续同焦点、是否切换到咨询准备路径。</p>
+              </div>
+            </div>
+            <div class="dot-list">
+              <div class="dot-item"><span class="dot-label">1</span><span>反馈区先写积极变化，再写仍需机会的点，以保持非诊断化、行动导向的前台体验。</span></div>
+              <div class="dot-item"><span class="dot-label">2</span><span>“继续 / 降难度 / 换焦点”被放成显式决策区，是为了验证反馈之后是否有自然下一步。</span></div>
+              <div class="dot-item"><span class="dot-label">3</span><span>更保守路径被单独显式标记，避免页面继续默认为“不断加强训练”。</span></div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </section>
+
+    <section class="footer-note paper-card">
+      <div class="eyebrow">Prototype Notes</div>
+      这是一份用于内部评审的低保真线框原型，重点验证信息架构、页面边界与状态回流，不代表最终视觉风格。
+      如果继续下一轮，建议直接在此基础上补两类内容：其一是首页、计划页、记录页、即时求助页的组件级低保真拆解；其二是前台卡片与后端对象的字段映射。
+    </section>
+  </main>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll('.nav-btn'));
+    const screens = Array.from(document.querySelectorAll('.screen'));
+
+    function activateScreen(id) {
+      buttons.forEach((button) => {
+        button.classList.toggle('active', button.dataset.target === id);
+      });
+      screens.forEach((screen) => {
+        screen.classList.toggle('active', screen.id === id);
+      });
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => activateScreen(button.dataset.target));
+    });
+  </script>
+</body>
+</html>

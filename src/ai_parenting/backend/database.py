@@ -22,7 +22,14 @@ _engine_kwargs: dict = {
 if _is_sqlite:
     _engine_kwargs["connect_args"] = {"check_same_thread": False}
 else:
-    _engine_kwargs["pool_pre_ping"] = True
+    # P1-1: PostgreSQL 连接池调优
+    _engine_kwargs.update({
+        "pool_pre_ping": True,
+        "pool_size": 20,
+        "max_overflow": 30,
+        "pool_recycle": 1800,  # 30 分钟回收长连接
+        "pool_timeout": 10,
+    })
 
 engine = create_async_engine(
     settings.database_url,

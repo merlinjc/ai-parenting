@@ -76,7 +76,7 @@ async def send_push_for_message(
     devices = result.scalars().all()
 
     if not devices:
-        message.push_status = "sent"  # 无设备也标记为 sent（无需推送）
+        message.push_status = "skipped"  # P2-10: 无设备标记为 skipped（而非 sent）
         message.push_sent_at = datetime.now(timezone.utc)
         return
 

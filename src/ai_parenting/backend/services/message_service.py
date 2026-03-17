@@ -143,6 +143,9 @@ async def update_read_status(
     read_status: str,
 ) -> Message | None:
     """更新消息阅读状态。"""
+    # P2-4: read_status 白名单校验
+    if read_status not in ("unread", "read"):
+        raise ValueError(f"Invalid read_status: {read_status}. Must be 'unread' or 'read'")
     message = await db.get(Message, message_id)
     if message is None:
         return None

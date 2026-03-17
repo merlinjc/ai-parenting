@@ -33,7 +33,7 @@ public struct OnboardingView: View {
             // 进度条
             progressBar
 
-            // 内容区
+            // 内容区（禁用滑动手势，防止用户绕过步骤校验）
             TabView(selection: $currentStep) {
                 welcomeStep.tag(0)
                 childInfoStep.tag(1)
@@ -41,6 +41,7 @@ public struct OnboardingView: View {
                 confirmStep.tag(3)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            .disabled(true) // 禁用手势滑动，仅通过按钮导航
             .animation(.easeInOut, value: currentStep)
 
             // 底部按钮
@@ -173,7 +174,8 @@ public struct OnboardingView: View {
                     HStack(spacing: 12) {
                         Picker("年", selection: $birthYear) {
                             let currentYear = Calendar.current.component(.year, from: Date())
-                            ForEach((currentYear - 4)...(currentYear - 1), id: \.self) { year in
+                            // 支持 18-48 个月（约 1.5-4 岁），扩展到 currentYear 支持边缘月龄
+                            ForEach((currentYear - 5)...currentYear, id: \.self) { year in
                                 Text("\(String(year))年").tag(year)
                             }
                         }
@@ -374,7 +376,12 @@ public struct OnboardingView: View {
     private var canProceed: Bool {
         switch currentStep {
         case 0: return !caregiverRole.isEmpty
-        case 1: return !childNickname.trimmingCharacters(in: .whitespaces).isEmpty
+        case 1:
+            let trimmedName = childNickname.trimmingCharacters(in: .whitespaces)
+            guard !trimmedName.isEmpty else { return false }
+            // 月龄需在 18-48 范围内（目标用户群）
+            let ageMonths = computeAgeMonths()
+            return ageMonths >= 18 && ageMonths <= 48
         case 2: return true // themes optional
         case 3: return !childNickname.trimmingCharacters(in: .whitespaces).isEmpty
         default: return true
@@ -406,8 +413,32 @@ public struct OnboardingView: View {
             )
             let child: ChildResponse = try await apiClient.request(.createChild(childCreate))
 
-            // 3. 完成引导标记
-            let _: ChildResponse = try await apiClient.request(.completeOnboarding(child.id))
+            // 3. 完成引导标记（失败不阻塞，重新登录会重试）
+            do {
+                let _: ChildResponse = try await apiClient.request(.completeOnboarding(child.id))
+            } catch {
+                // completeOnboarding 失败：Profile + Child 已创建成功，
+                // 用户可以正常使用，下次启动时 AppState 会重新检查 onboarding 状态
+                print("[Onboarding] completeOnboarding failed (non-blocking): \(error)")
+            }
+
+            // 3.5 初始化 OpenClaw 记忆文件系统（非阻塞）
+            // 基于用户角色和儿童信息为 AI 助手建立层级记忆
+            Task {
+                do {
+                    let memoryReq = MemoryInitRequest(
+                        childId: child.id,
+                        caregiverRole: caregiverRole,
+                        recentSituation: recentSituation.trimmingCharacters(in: .whitespaces)
+                    )
+                    let _: MemoryInitResponse = try await apiClient.request(.initializeMemory(memoryReq))
+                    print("[Onboarding] Memory initialized successfully")
+                } catch {
+                    // 记忆初始化失败不影响用户使用
+                    // AI 助手会在首次对话时使用默认记忆
+                    print("[Onboarding] Memory initialization failed (non-blocking): \(error)")
+                }
+            }
 
             // 4. 刷新 AppState
             await appState.refreshChildren()

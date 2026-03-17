@@ -149,7 +149,7 @@ public struct PlanDetailView: View {
                         ProgressView()
                             .tint(.white)
                     }
-                    Text(vm.isCreating ? "AI 生成中..." : "生成新计划")
+                    Text(vm.isCreating ? "AI 正在生成计划..." : "生成新计划")
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -162,6 +162,19 @@ public struct PlanDetailView: View {
             .disabled(vm.isCreating)
             .padding(.horizontal, 40)
 
+            if vm.isCreating {
+                VStack(spacing: 6) {
+                    Text("AI 正在分析儿童发育数据并生成个性化计划")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("预计需要 30-60 秒，请耐心等待")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            }
+
             // 即使无活跃计划也可查看历次计划
             Button {
                 showPlanHistory = true
@@ -172,17 +185,8 @@ public struct PlanDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .sheet(isPresented: $showPlanHistory) {
-            NavigationStack {
-                planHistoryView(vm)
-                    .navigationTitle("历次计划")
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("关闭") { showPlanHistory = false }
-                        }
-                    }
-            }
-        }
+        // 注意：.sheet(isPresented: $showPlanHistory) 统一在 planContent 层级注册，
+        // 此处不再重复绑定，避免同一 @State 绑定多个 sheet 的不确定行为
     }
 
     // MARK: - Progress Section

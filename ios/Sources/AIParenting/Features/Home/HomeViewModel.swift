@@ -15,6 +15,31 @@ public final class HomeViewModel {
     public var isLoading = false
     public var error: APIError?
 
+    // MARK: - Task Action State
+
+    /// 今日任务的行动按钮状态
+    public enum TaskActionState {
+        case start       // 待执行 → "开始今日练习"
+        case record      // 已执行未记录 → "去记录"
+        case completed   // 已完成 → "查看详情"
+
+        public var title: String {
+            switch self {
+            case .start: "开始今日练习"
+            case .record: "去记录"
+            case .completed: "查看详情"
+            }
+        }
+
+        public var icon: String {
+            switch self {
+            case .start: "play.circle.fill"
+            case .record: "square.and.pencil"
+            case .completed: "checkmark.circle.fill"
+            }
+        }
+    }
+
     // MARK: - Computed
 
     public var child: ChildResponse? { summary?.child }
@@ -24,8 +49,25 @@ public final class HomeViewModel {
     public var unreadCount: Int { summary?.unreadCount ?? 0 }
     public var weeklyFeedbackStatus: String? { summary?.weeklyFeedbackStatus }
     public var weeklyFeedbackId: UUID? { summary?.weeklyFeedbackId }
+    public var greeting: String { summary?.greeting ?? "" }
+    public var streakDays: Int { summary?.streakDays ?? 0 }
+    public var weekDayStatuses: [String] { summary?.weekDayStatuses ?? [] }
+
     public var hasWeeklyFeedbackReady: Bool {
         weeklyFeedbackStatus == "ready" || weeklyFeedbackStatus == "viewed"
+    }
+
+    /// 今日任务的行动状态
+    public var taskActionState: TaskActionState {
+        guard let task = todayTask else { return .start }
+        switch task.completionStatus {
+        case "executed":
+            return .completed
+        case "needs_record":
+            return .record
+        default:
+            return .start
+        }
     }
 
     /// 计划阶段显示名
@@ -74,11 +116,16 @@ public final class HomeViewModel {
         isLoading = true
         error = nil
 
-        // 先刷新月龄（静默，不阻塞）
-        _ = try? await apiClient.request(.refreshStage(childId)) as ChildResponse
-
         do {
-            let result: HomeSummaryResponse = try await apiClient.request(.homeSummary(childId: childId))
+            // 并行执行月龄刷新和首页摘要请求（减少 200-500ms 串行等待）
+            async let refreshTask: Void = {
+                _ = try? await apiClient.request(.refreshStage(childId)) as ChildResponse
+            }()
+            async let summaryTask = apiClient.request(.homeSummary(childId: childId)) as HomeSummaryResponse
+
+            // 等待两个并行任务完成
+            _ = await refreshTask
+            let result = try await summaryTask
             summary = result
         } catch let apiError as APIError {
             error = apiError

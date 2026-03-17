@@ -72,6 +72,26 @@ public enum Endpoint: Sendable {
     // MARK: - Consult Prep
     case getConsultPrep(childId: UUID)
 
+    // MARK: - Channels
+    case listChannelBindings
+    case bindChannel(ChannelBindingCreate)
+    case unbindChannel(UUID)
+    case getChannelPreferences
+    case updateChannelPreferences(ChannelPreferenceUpdate)
+    case wechatQRCode
+
+    // MARK: - Voice
+    case voiceConverse(VoiceConverseRequest)
+    case voiceTranscribe(VoiceTranscribeRequest)
+    case voiceSynthesize(VoiceSynthesizeRequest)
+
+    // MARK: - Skills
+    case listSkills
+    case runSleepAnalysis(SleepAnalysisRequest)
+
+    // MARK: - Memory
+    case initializeMemory(MemoryInitRequest)
+
     // MARK: - Computed Properties
 
     public var method: String {
@@ -79,16 +99,25 @@ public enum Endpoint: Sendable {
         case .health, .listChildren, .getChild, .listRecords, .getRecord,
              .getActivePlan, .getPlan, .listPlans, .homeSummary, .getFeedback,
              .listMessages, .unreadCount, .getMessage, .getSession,
-             .getProfile, .getConsultPrep:
+             .getProfile, .getConsultPrep,
+             .listChannelBindings, .getChannelPreferences, .wechatQRCode,
+             .listSkills:
             return "GET"
-        case .updateChild, .updateMessage, .updateProfile, .appendFocusNote:
+        case .updateChild, .updateMessage, .updateProfile, .appendFocusNote,
+             .updateChannelPreferences:
             return "PATCH"
         case .register, .login, .refreshToken,
              .createChild, .refreshStage, .completeOnboarding,
              .createRecord, .createPlan, .updateDayTaskCompletion,
              .instantHelp, .createFeedback, .markFeedbackViewed,
              .submitDecision, .messageClicked, .messageDelivered,
-             .registerDevice, .uploadFile:
+             .registerDevice, .uploadFile,
+             .bindChannel, .voiceConverse, .voiceTranscribe, .voiceSynthesize,
+             .runSleepAnalysis:
+            return "POST"
+        case .unbindChannel:
+            return "DELETE"
+        case .initializeMemory:
             return "POST"
         }
     }
@@ -193,8 +222,47 @@ public enum Endpoint: Sendable {
         // Consult Prep
         case .getConsultPrep:
             return "/api/v1/consult-prep"
+
+        // Channels
+        case .listChannelBindings:
+            return "/api/v1/channels"
+        case .bindChannel:
+            return "/api/v1/channels/bind"
+        case .unbindChannel(let id):
+            return "/api/v1/channels/\(id.uuidString)"
+        case .getChannelPreferences:
+            return "/api/v1/channels/preferences"
+        case .updateChannelPreferences:
+            return "/api/v1/channels/preferences"
+        case .wechatQRCode:
+            return "/api/v1/channels/wechat/qrcode"
+
+        // Voice
+        case .voiceConverse:
+            return "/api/v1/voice/converse"
+        case .voiceTranscribe:
+            return "/api/v1/voice/transcribe"
+        case .voiceSynthesize:
+            return "/api/v1/voice/synthesize"
+
+        // Skills
+        case .listSkills:
+            return "/api/v1/skills"
+        case .runSleepAnalysis:
+            return "/api/v1/skills/sleep-analysis"
+        case .initializeMemory:
+            return "/api/v1/memory/initialize"
         }
     }
+
+    // MARK: - Cached Formatter
+
+    /// 缓存 ISO8601DateFormatter 避免每次查询创建新实例
+    private static let iso8601Formatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
 
     public var queryItems: [URLQueryItem]? {
         switch self {
@@ -204,7 +272,7 @@ public enum Endpoint: Sendable {
                 URLQueryItem(name: "limit", value: String(limit))
             ]
             if let before {
-                items.append(URLQueryItem(name: "before", value: ISO8601DateFormatter().string(from: before)))
+                items.append(URLQueryItem(name: "before", value: Self.iso8601Formatter.string(from: before)))
             }
             if let type {
                 items.append(URLQueryItem(name: "type", value: type))
@@ -227,7 +295,7 @@ public enum Endpoint: Sendable {
         case .listMessages(let limit, let before):
             var items = [URLQueryItem(name: "limit", value: String(limit))]
             if let before {
-                items.append(URLQueryItem(name: "before", value: ISO8601DateFormatter().string(from: before)))
+                items.append(URLQueryItem(name: "before", value: Self.iso8601Formatter.string(from: before)))
             }
             return items
 
@@ -255,6 +323,13 @@ public enum Endpoint: Sendable {
         case .updateProfile(let data): return data
         case .registerDevice(let data): return data
         case .appendFocusNote(_, let data): return data
+        case .bindChannel(let data): return data
+        case .updateChannelPreferences(let data): return data
+        case .voiceConverse(let data): return data
+        case .voiceTranscribe(let data): return data
+        case .voiceSynthesize(let data): return data
+        case .runSleepAnalysis(let data): return data
+        case .initializeMemory(let data): return data
         default: return nil
         }
     }
@@ -270,10 +345,12 @@ public enum Endpoint: Sendable {
     /// 期望的成功状态码
     public var expectedStatusCode: Int {
         switch self {
-        case .register, .createChild, .createRecord, .createPlan, .instantHelp, .registerDevice, .uploadFile:
+        case .register, .createChild, .createRecord, .createPlan, .instantHelp, .registerDevice, .uploadFile, .bindChannel, .initializeMemory:
             return 201
         case .createFeedback:
             return 202
+        case .unbindChannel:
+            return 204
         default:
             return 200
         }

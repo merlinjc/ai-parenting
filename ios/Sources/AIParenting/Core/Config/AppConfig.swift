@@ -28,18 +28,27 @@ public struct AppConfig: Sendable {
         self.defaultPageSize = defaultPageSize
     }
 
-    /// 默认配置
-    /// 使用 127.0.0.1 而非 localhost，避免 iOS 模拟器 Sandbox 阻止 DNS 解析
-    public static let `default` = AppConfig(
-        baseURL: URL(string: "http://127.0.0.1:8000")!,
-        requestTimeout: 30,
-        aiRequestTimeout: 60,
-        pollingInterval: 2,
-        defaultPageSize: 20
-    )
+    /// 生产环境配置（Release 构建使用）
+    /// TODO: 上线前替换为实际生产域名
+    public static let production: AppConfig = {
+        let url = URL(string: "https://api.aiparenting.example.com")!
+        // 编译时安全检查：Release 构建禁止使用 example.com 占位域名
+        #if !DEBUG
+        // 如果此断言触发，说明上线前未替换生产域名
+        assert(!url.host!.contains("example.com"),
+               "⚠️ 生产环境 URL 仍为 example.com 占位！请在 AppConfig 中替换为实际域名。")
+        #endif
+        return AppConfig(
+            baseURL: url,
+            requestTimeout: 30,
+            aiRequestTimeout: 90,
+            pollingInterval: 3,
+            defaultPageSize: 20
+        )
+    }()
 
-    #if DEBUG
-    /// 开发环境配置
+    /// 开发环境配置（本地调试）
+    /// 使用 127.0.0.1 而非 localhost，避免 iOS 模拟器 Sandbox 阻止 DNS 解析
     public static let development = AppConfig(
         baseURL: URL(string: "http://127.0.0.1:8000")!,
         requestTimeout: 30,
@@ -47,5 +56,13 @@ public struct AppConfig: Sendable {
         pollingInterval: 2,
         defaultPageSize: 20
     )
-    #endif
+
+    /// 默认配置：DEBUG 构建使用开发环境，Release 构建使用生产环境
+    public static let `default`: AppConfig = {
+        #if DEBUG
+        return .development
+        #else
+        return .production
+        #endif
+    }()
 }
