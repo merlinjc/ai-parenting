@@ -73,7 +73,7 @@ export default function ChannelMonitorPage() {
         {channelStatuses.map((ch) => {
           const statusInfo = STATUS_MAP[ch.status]
           return (
-            <Card key={ch.channel} bordered hoverable className="!rounded-xl !shadow-sm hover:!shadow-md transition-all hover:-translate-y-0.5">
+            <Card key={ch.channel} bordered className="!rounded-xl !shadow-sm hover:!shadow-md transition-all hover:-translate-y-0.5">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-gray-800">{ch.displayName}</span>
@@ -129,7 +129,7 @@ export default function ChannelMonitorPage() {
             <YAxis tick={{ fontSize: 12, fill: '#8B8B8B' }} unit="ms" />
             <Tooltip
               contentStyle={{ borderRadius: 8, border: '1px solid #eee', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-              formatter={(value: number) => [`${value.toFixed(0)}ms`]}
+              formatter={(value: unknown) => [`${Number(value).toFixed(0)}ms`]}
             />
             <Legend />
             <Line type="monotone" dataKey="APNs" stroke={CHANNEL_COLORS['APNs']} strokeWidth={2} dot={false} />
@@ -156,14 +156,15 @@ export default function ChannelMonitorPage() {
                   outerRadius={90}
                   dataKey="count"
                   nameKey="channel"
-                  label={({ channel, percentage }: { channel: string; percentage: number }) => `${channel} ${percentage}%`}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  label={(props: any) => `${props.channel} ${props.percentage}%`}
                   labelLine={{ strokeWidth: 1 }}
                 >
                   {bindingStats.map((entry) => (
                     <Cell key={entry.channel} fill={CHANNEL_COLORS[entry.channel] || '#8B8B8B'} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => [value.toLocaleString(), '绑定数']} />
+                <Tooltip formatter={(value: unknown) => [Number(value).toLocaleString(), '绑定数']} />
               </PieChart>
             </ResponsiveContainer>
 

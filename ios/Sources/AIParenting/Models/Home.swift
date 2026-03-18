@@ -12,6 +12,7 @@ public struct HomeSummaryResponse: Codable, Sendable {
     public let greeting: String
     public let streakDays: Int
     public let weekDayStatuses: [String]
+    public let planGenerating: Bool  // 是否有正在进行中的计划生成
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -25,11 +26,12 @@ public struct HomeSummaryResponse: Codable, Sendable {
         greeting = try container.decodeIfPresent(String.self, forKey: .greeting) ?? ""
         streakDays = try container.decodeIfPresent(Int.self, forKey: .streakDays) ?? 0
         weekDayStatuses = try container.decodeIfPresent([String].self, forKey: .weekDayStatuses) ?? []
+        planGenerating = try container.decodeIfPresent(Bool.self, forKey: .planGenerating) ?? false
     }
 
     private enum CodingKeys: String, CodingKey {
         case child, activePlan, todayTask, recentRecords, unreadCount
         case weeklyFeedbackStatus, weeklyFeedbackId
-        case greeting, streakDays, weekDayStatuses
+        case greeting, streakDays, weekDayStatuses, planGenerating
     }
 }

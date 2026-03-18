@@ -51,4 +51,5 @@ async def get_home_summary(
         greeting=data["greeting"],
         streak_days=data["streak_days"],
         week_day_statuses=data["week_day_statuses"],
+        plan_generating=data.get("plan_generating", False),
     )

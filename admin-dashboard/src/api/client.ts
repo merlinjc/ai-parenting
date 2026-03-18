@@ -57,13 +57,19 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     )
   }
 
+  // 处理 204 No Content
+  if (response.status === 204) {
+    return undefined as T
+  }
+
   return response.json()
 }
 
 export const apiClient = {
   get: <T>(endpoint: string) => request<T>(endpoint),
-  post: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: 'POST', body }),
+  post: <T>(endpoint: string, body?: unknown) => request<T>(endpoint, { method: 'POST', body }),
   put: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: 'PUT', body }),
+  patch: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: 'PATCH', body }),
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
 }
 

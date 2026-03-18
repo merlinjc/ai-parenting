@@ -32,6 +32,8 @@ final class PlaceholderTests: XCTestCase {
         XCTAssertEqual(ChildStage.months18to24.rawValue, "18_24m")
         XCTAssertEqual(RiskLevel.normal.rawValue, "normal")
         XCTAssertEqual(FocusTheme.selfCare.rawValue, "self_care")
+        XCTAssertEqual(FocusTheme.sensoryProcessing.rawValue, "sensory_processing")
+        XCTAssertEqual(FocusTheme.attachmentSecurity.rawValue, "attachment_security")
         XCTAssertEqual(CompletionStatus.needsRecord.rawValue, "needs_record")
         XCTAssertEqual(DecisionValue.lowerDifficulty.rawValue, "lower_difficulty")
         XCTAssertEqual(MessageType.riskAlert.rawValue, "risk_alert")

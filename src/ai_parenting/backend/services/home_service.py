@@ -15,8 +15,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_parenting.backend.models import AISession
 from ai_parenting.backend.services import (
     child_service,
     message_service,
@@ -131,6 +133,20 @@ async def get_home_summary(
     # --- 本周每日完成状态（纯计算，无 I/O）---
     week_day_statuses = _extract_week_day_statuses(active_plan)
 
+    # --- 检测是否有正在进行的计划生成（无活跃计划时才查）---
+    plan_generating = False
+    if child and active_plan is None:
+        result = await db.execute(
+            select(AISession)
+            .where(
+                AISession.child_id == child_id,
+                AISession.session_type == "plan_generation",
+                AISession.status.in_(["pending", "processing"]),
+            )
+            .limit(1)
+        )
+        plan_generating = result.scalar_one_or_none() is not None
+
     return {
         "child": child,
         "active_plan": active_plan,
@@ -142,4 +158,5 @@ async def get_home_summary(
         "greeting": greeting,
         "streak_days": streak_days,
         "week_day_statuses": week_day_statuses,
+        "plan_generating": plan_generating,
     }

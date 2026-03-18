@@ -80,7 +80,7 @@ export default function PushRulesPage() {
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card bordered hoverable className="!rounded-xl !shadow-sm hover:!shadow-md transition-shadow">
+        <Card bordered className="!rounded-xl !shadow-sm hover:!shadow-md transition-shadow">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center">
               <ChartLineIcon size="24px" style={{ color: 'white' }} />
@@ -91,7 +91,7 @@ export default function PushRulesPage() {
           </div>
         </Card>
 
-        <Card bordered hoverable className="!rounded-xl !shadow-sm hover:!shadow-md transition-shadow">
+        <Card bordered className="!rounded-xl !shadow-sm hover:!shadow-md transition-shadow">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-success to-emerald-400 flex items-center justify-center">
               <CheckCircleIcon size="24px" style={{ color: 'white' }} />
@@ -102,7 +102,7 @@ export default function PushRulesPage() {
           </div>
         </Card>
 
-        <Card bordered hoverable className="!rounded-xl !shadow-sm hover:!shadow-md transition-shadow">
+        <Card bordered className="!rounded-xl !shadow-sm hover:!shadow-md transition-shadow">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-warning to-amber-400 flex items-center justify-center">
               <ErrorCircleIcon size="24px" style={{ color: 'white' }} />
@@ -113,7 +113,7 @@ export default function PushRulesPage() {
           </div>
         </Card>
 
-        <Card bordered hoverable className="!rounded-xl !shadow-sm hover:!shadow-md transition-shadow">
+        <Card bordered className="!rounded-xl !shadow-sm hover:!shadow-md transition-shadow">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-danger to-red-400 flex items-center justify-center">
               <CloseCircleIcon size="24px" style={{ color: 'white' }} />

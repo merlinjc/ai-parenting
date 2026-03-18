@@ -404,6 +404,8 @@ class Orchestrator:
                 context=context,
                 child_nickname=kwargs.get("child_nickname", ""),
                 recent_records_summary=kwargs.get("recent_records_summary", ""),
+                feedback_context_text=kwargs.get("feedback_context_text", ""),
+                first_week_context_text=kwargs.get("first_week_context_text", ""),
             )
         elif session_type == SessionType.WEEKLY_FEEDBACK:
             return render_weekly_feedback_prompt(

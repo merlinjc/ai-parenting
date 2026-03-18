@@ -33,6 +33,9 @@ public enum RiskLevel: String, Codable, Sendable, CaseIterable {
 }
 
 /// 关注主题
+///
+/// V2.0 新增：sensoryProcessing（感觉处理与调节）、attachmentSecurity（依恋安全与基地行为）
+/// 与后端 DevTheme 的 8 值体系对齐，同时保持对旧 6 值的向后兼容。
 public enum FocusTheme: String, Codable, Sendable, CaseIterable {
     case language
     case social
@@ -40,6 +43,9 @@ public enum FocusTheme: String, Codable, Sendable, CaseIterable {
     case motor
     case cognition
     case selfCare = "self_care"
+    // V2.0 新增
+    case sensoryProcessing = "sensory_processing"
+    case attachmentSecurity = "attachment_security"
 
     public var displayName: String {
         switch self {
@@ -49,6 +55,22 @@ public enum FocusTheme: String, Codable, Sendable, CaseIterable {
         case .motor: return "运动"
         case .cognition: return "认知"
         case .selfCare: return "自理"
+        case .sensoryProcessing: return "感觉调节"
+        case .attachmentSecurity: return "依恋安全"
+        }
+    }
+
+    /// 主题图标（SF Symbols）
+    public var iconName: String {
+        switch self {
+        case .language: return "mouth.fill"
+        case .social: return "person.2.fill"
+        case .emotion: return "heart.fill"
+        case .motor: return "figure.run"
+        case .cognition: return "brain.head.profile"
+        case .selfCare: return "hands.sparkles.fill"
+        case .sensoryProcessing: return "hand.raised.fingers.spread.fill"
+        case .attachmentSecurity: return "figure.2.and.child.holdinghands"
         }
     }
 }

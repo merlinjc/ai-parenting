@@ -23,7 +23,6 @@ from ai_parenting.backend.database import async_session_factory, engine
 from ai_parenting.backend.models import Base
 from ai_parenting.backend.routers import (
     admin,
-    admin_panel,
     ai_sessions,
     auth,
     channels,
@@ -180,8 +179,6 @@ def create_app() -> FastAPI:
     app.include_router(consult_prep.router, prefix="/api/v1")
     app.include_router(memory.router, prefix="/api/v1")
     app.include_router(admin.router, prefix="/api/v1")
-    # Admin 面板（不带 /api/v1 前缀，直接挂载到根路径）
-    app.include_router(admin_panel.router)
     # Webhooks（不带 /api/v1 前缀，外部平台直接回调）
     app.include_router(webhooks.router)
 

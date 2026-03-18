@@ -217,10 +217,30 @@ class PlanResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PlanInitialContext(BaseModel):
+    """首次计划生成的引导上下文。
+
+    在引导流程中收集的个性化信号，用于增强首次计划的个性化程度。
+    所有字段均为可选，未填写时使用空字符串。
+    """
+
+    caregiver_role: str = ""
+    recent_situation: str = ""
+    daily_routine_note: str = ""
+    interaction_style: str = ""
+    current_concern: str = ""
+    best_moment: str = ""
+
+
 class PlanCreateRequest(BaseModel):
-    """创建微计划请求（触发 AI 生成）。"""
+    """创建微计划请求（触发 AI 生成）。
+
+    initial_context 仅在首次引导完成后自动创建时传入，
+    后续手动创建计划时为 None。
+    """
 
     child_id: uuid.UUID
+    initial_context: PlanInitialContext | None = None
 
 
 class PlanWithFeedbackStatus(BaseModel):
@@ -392,6 +412,7 @@ class HomeSummaryResponse(BaseModel):
     greeting: str = ""
     streak_days: int = 0
     week_day_statuses: list[str] = Field(default_factory=list)
+    plan_generating: bool = False  # 是否有正在进行中的计划生成会话
 
 
 # ---------------------------------------------------------------------------

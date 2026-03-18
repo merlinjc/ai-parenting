@@ -52,6 +52,7 @@ public final class HomeViewModel {
     public var greeting: String { summary?.greeting ?? "" }
     public var streakDays: Int { summary?.streakDays ?? 0 }
     public var weekDayStatuses: [String] { summary?.weekDayStatuses ?? [] }
+    public var planGenerating: Bool { summary?.planGenerating ?? false }
 
     public var hasWeeklyFeedbackReady: Bool {
         weeklyFeedbackStatus == "ready" || weeklyFeedbackStatus == "viewed"

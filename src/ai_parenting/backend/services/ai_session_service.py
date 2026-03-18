@@ -7,9 +7,12 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai_parenting.backend.audit import log_ai_session, log_risk_escalation
 from ai_parenting.backend.models import AISession, Child, Plan
 from ai_parenting.backend.services import child_service, message_service, plan_service, record_service
+from ai_parenting.backend.services.plan_feedback_aggregator import (
+    aggregate_plan_feedback,
+    render_feedback_context_text,
+)
 from ai_parenting.models.enums import SessionStatus, SessionType
 from ai_parenting.models.schemas import ContextSnapshot
 from ai_parenting.orchestrator import Orchestrator
@@ -182,10 +189,18 @@ async def create_plan_generation_session(
     db: AsyncSession,
     orchestrator: Orchestrator,
     child_id: uuid.UUID,
+    initial_context: Any | None = None,
 ) -> AISession:
     """创建微计划生成 AI 会话并执行 AI 调用。
 
     成功后自动调用 plan_service.create_plan_from_ai_result 创建计划。
+
+    Args:
+        db: 数据库会话。
+        orchestrator: AI 编排器。
+        child_id: 儿童 ID。
+        initial_context: 首次引导时收集的个性化上下文（PlanInitialContext），
+            仅在引导完成后首次创建计划时传入。后续计划为 None。
     """
     child = await child_service.get_child(db, child_id)
     if child is None:
@@ -213,12 +228,31 @@ async def create_plan_generation_session(
     session.status = SessionStatus.PROCESSING.value
     await db.flush()
 
+    # 聚合上一轮计划的反馈数据，用于个性化调整
+    feedback_context_text = ""
+    try:
+        feedback_ctx = await aggregate_plan_feedback(db, child_id)
+        feedback_context_text = await render_feedback_context_text(feedback_ctx)
+    except Exception as fb_exc:
+        # 反馈聚合失败不影响基础计划生成
+        logger.warning(
+            "Plan feedback aggregation failed for child=%s: %s",
+            child_id, fb_exc,
+        )
+
+    # 构建首次引导上下文文本（如果有）
+    first_week_context_text = ""
+    if initial_context is not None:
+        first_week_context_text = _build_first_week_context_text(initial_context)
+
     try:
         result = await orchestrator.orchestrate(
             session_type=SessionType.PLAN_GENERATION,
             context=context,
             child_nickname=child.nickname,
             recent_records_summary=records_summary,
+            feedback_context_text=feedback_context_text,
+            first_week_context_text=first_week_context_text,
         )
 
         session.status = result.status.value
@@ -264,3 +298,71 @@ async def get_session(db: AsyncSession, session_id: uuid.UUID) -> AISession | No
         select(AISession).where(AISession.id == session_id)
     )
     return result.scalar_one_or_none()
+
+
+def _build_first_week_context_text(initial_context: Any) -> str:
+    """将首次引导收集的个性化信号组装为 Prompt 文本段。
+
+    Args:
+        initial_context: PlanInitialContext 或包含对应字段的 dict/对象。
+
+    Returns:
+        首周上下文 Prompt 文本段，用于注入到计划生成模板。
+        如果所有字段均为空，返回空字符串。
+    """
+    # 兼容 dict 和 Pydantic model
+    if hasattr(initial_context, "model_dump"):
+        ctx = initial_context.model_dump()
+    elif isinstance(initial_context, dict):
+        ctx = initial_context
+    else:
+        return ""
+
+    parts: list[str] = []
+
+    caregiver_role = ctx.get("caregiver_role", "")
+    if caregiver_role:
+        role_display = {
+            "mother": "妈妈",
+            "father": "爸爸",
+            "grandparent": "祖辈",
+            "other": "其他照护者",
+        }.get(caregiver_role, caregiver_role)
+        parts.append(f"- 主要照护者角色：{role_display}")
+
+    recent_situation = ctx.get("recent_situation", "")
+    if recent_situation:
+        parts.append(f"- 家长描述的近况：{recent_situation}")
+
+    daily_routine = ctx.get("daily_routine_note", "")
+    if daily_routine:
+        parts.append(f"- 日常作息特点：{daily_routine}")
+
+    interaction = ctx.get("interaction_style", "")
+    if interaction:
+        parts.append(f"- 孩子喜欢的互动方式：{interaction}")
+
+    concern = ctx.get("current_concern", "")
+    if concern:
+        parts.append(f"- 家长当前最想解决的问题：{concern}")
+
+    best_moment = ctx.get("best_moment", "")
+    if best_moment:
+        parts.append(f"- 最近的愉快亲子互动：{best_moment}")
+
+    if not parts:
+        return ""
+
+    return (
+        "【首次引导上下文——家长在引导流程中提供的信息】\n\n"
+        "这是该家庭首次使用本产品，以下是家长在引导流程中主动提供的信息。\n"
+        "请在生成第一份计划时充分参考这些信号，让计划更贴合这个家庭的实际情况：\n\n"
+        + "\n".join(parts)
+        + "\n\n"
+        "◉ 首周特别注意事项\n"
+        "- 这是家长第一次使用，请确保 Day 1 的任务特别简单、低门槛，让家长感到\"这个我能做到\"\n"
+        "- 如果家长提到了具体的困扰，在 Day 1-3 的场景中优先围绕该困扰设计\n"
+        "- 如果家长描述了孩子喜欢的互动方式，优先在这些场景中嵌入练习\n"
+        "- 在 conservative_note 中加入\"第一周是适应期\"的温和表达\n"
+        "- demo_script 要格外自然、简短，让第一次使用的家长不会感到压力"
+    )

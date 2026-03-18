@@ -305,6 +305,8 @@ final class DecodingTests: XCTestCase {
         XCTAssertEqual(try decoder.decode(ChildStage.self, from: "\"18_24m\"".data(using: .utf8)!), .months18to24)
         XCTAssertEqual(try decoder.decode(RiskLevel.self, from: "\"consult\"".data(using: .utf8)!), .consult)
         XCTAssertEqual(try decoder.decode(FocusTheme.self, from: "\"self_care\"".data(using: .utf8)!), .selfCare)
+        XCTAssertEqual(try decoder.decode(FocusTheme.self, from: "\"sensory_processing\"".data(using: .utf8)!), .sensoryProcessing)
+        XCTAssertEqual(try decoder.decode(FocusTheme.self, from: "\"attachment_security\"".data(using: .utf8)!), .attachmentSecurity)
         XCTAssertEqual(try decoder.decode(CompletionStatus.self, from: "\"needs_record\"".data(using: .utf8)!), .needsRecord)
         XCTAssertEqual(try decoder.decode(DecisionValue.self, from: "\"lower_difficulty\"".data(using: .utf8)!), .lowerDifficulty)
         XCTAssertEqual(try decoder.decode(MessageType.self, from: "\"risk_alert\"".data(using: .utf8)!), .riskAlert)

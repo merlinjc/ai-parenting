@@ -11,6 +11,46 @@ public struct PlanCreateRequest: Codable, Sendable {
     }
 }
 
+/// 创建微计划请求（带首次引导上下文）
+public struct PlanCreateWithContextRequest: Codable, Sendable {
+    public let childId: UUID
+    public let initialContext: PlanInitialContext?
+
+    public init(childId: UUID, initialContext: PlanInitialContext? = nil) {
+        self.childId = childId
+        self.initialContext = initialContext
+    }
+}
+
+/// 首次计划生成的引导上下文
+///
+/// 在引导流程中收集的个性化信号，传入计划生成 API。
+/// 包含照护者角色、近况描述和初始观察问题的回答。
+public struct PlanInitialContext: Codable, Sendable {
+    public let caregiverRole: String
+    public let recentSituation: String
+    public let dailyRoutineNote: String
+    public let interactionStyle: String
+    public let currentConcern: String
+    public let bestMoment: String
+
+    public init(
+        caregiverRole: String = "",
+        recentSituation: String = "",
+        dailyRoutineNote: String = "",
+        interactionStyle: String = "",
+        currentConcern: String = "",
+        bestMoment: String = ""
+    ) {
+        self.caregiverRole = caregiverRole
+        self.recentSituation = recentSituation
+        self.dailyRoutineNote = dailyRoutineNote
+        self.interactionStyle = interactionStyle
+        self.currentConcern = currentConcern
+        self.bestMoment = bestMoment
+    }
+}
+
 /// 日任务完成状态更新
 public struct DayTaskCompletionUpdate: Codable, Sendable {
     public let completionStatus: String

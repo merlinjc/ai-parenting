@@ -2,13 +2,15 @@ import SwiftUI
 
 /// 首次使用引导流程
 ///
-/// 对应低保真原型的"进入层"：4步引导
+/// 对应低保真原型的"进入层"：5步引导
 /// Step 1: 欢迎 + 角色选择
 /// Step 2: 儿童基础信息（昵称、出生年月）
 /// Step 3: 初始关注主题选择
-/// Step 4: 确认并进入
+/// Step 4: 初始观察（3-5 个针对性问题，收集个性化信号）
+/// Step 5: 确认并进入 → 过渡到"计划生成中"
 ///
-/// 完成后创建儿童档案、调用 completeOnboarding、刷新 AppState。
+/// 完成后创建儿童档案、调用 completeOnboarding、
+/// 触发首份计划生成并展示生成过渡页。
 public struct OnboardingView: View {
 
     @Environment(APIClient.self) private var apiClient
@@ -21,33 +23,56 @@ public struct OnboardingView: View {
     @State private var birthMonth = Calendar.current.component(.month, from: Date())
     @State private var selectedThemes: Set<FocusTheme> = []
     @State private var recentSituation = ""
+    // 初始观察问题的回答
+    @State private var dailyRoutineNote = ""        // 日常作息特点
+    @State private var interactionStyle = ""         // 互动方式偏好
+    @State private var currentConcern = ""           // 当前最想解决的问题
+    @State private var bestMoment = ""               // 最近一次愉快互动
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @State private var showPlanGenerating = false
+    @State private var createdChildId: UUID?
 
-    private let totalSteps = 4
+    private let totalSteps = 5
 
     public init() {}
 
     public var body: some View {
-        VStack(spacing: 0) {
-            // 进度条
-            progressBar
+        ZStack {
+            VStack(spacing: 0) {
+                // 进度条
+                progressBar
 
-            // 内容区（禁用滑动手势，防止用户绕过步骤校验）
-            TabView(selection: $currentStep) {
-                welcomeStep.tag(0)
-                childInfoStep.tag(1)
-                focusThemeStep.tag(2)
-                confirmStep.tag(3)
+                // 内容区（禁用滑动手势，防止用户绕过步骤校验）
+                TabView(selection: $currentStep) {
+                    welcomeStep.tag(0)
+                    childInfoStep.tag(1)
+                    focusThemeStep.tag(2)
+                    initialObservationStep.tag(3)
+                    confirmStep.tag(4)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .disabled(true) // 禁用手势滑动，仅通过按钮导航
+                .animation(.easeInOut, value: currentStep)
+
+                // 底部按钮
+                bottomActions
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .disabled(true) // 禁用手势滑动，仅通过按钮导航
-            .animation(.easeInOut, value: currentStep)
+            .background(Color.appBackground)
+            .opacity(showPlanGenerating ? 0 : 1)
 
-            // 底部按钮
-            bottomActions
+            // 计划生成过渡页
+            if showPlanGenerating {
+                PlanGeneratingView(
+                    childName: childNickname,
+                    childId: createdChildId,
+                    apiClient: apiClient,
+                    appState: appState
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
         }
-        .background(Color.appBackground)
+        .animation(.easeInOut(duration: 0.5), value: showPlanGenerating)
     }
 
     // MARK: - Progress Bar
@@ -283,7 +308,122 @@ public struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 4: Confirm
+    // MARK: - Step 4: Initial Observation
+
+    private var initialObservationStep: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                Image(systemName: "eye.circle.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.appPrimary, Color.appSecondary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .padding(.top, 20)
+
+                VStack(spacing: 6) {
+                    Text("了解更多细节")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Text("回答几个简单问题，帮助 AI 生成更贴合的第一份计划")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
+                }
+
+                VStack(spacing: 20) {
+                    // Q1: 日常作息特点
+                    observationQuestion(
+                        icon: "clock.fill",
+                        iconColor: .orange,
+                        title: "日常作息",
+                        subtitle: "孩子每天的主要活动节奏是怎样的？",
+                        placeholder: "例如：早上 9 点起床，上午去公园，下午午睡 2 小时",
+                        text: $dailyRoutineNote
+                    )
+
+                    // Q2: 互动方式偏好
+                    observationQuestion(
+                        icon: "person.2.circle.fill",
+                        iconColor: .blue,
+                        title: "互动方式",
+                        subtitle: "孩子目前最喜欢的玩耍或互动方式是什么？",
+                        placeholder: "例如：喜欢看绘本、堆积木、在户外跑跳",
+                        text: $interactionStyle
+                    )
+
+                    // Q3: 当前最想解决的问题
+                    observationQuestion(
+                        icon: "questionmark.circle.fill",
+                        iconColor: .purple,
+                        title: "当前挑战",
+                        subtitle: "您目前在养育中最想得到帮助的一件事是什么？",
+                        placeholder: "例如：孩子不愿意和其他小朋友玩、吃饭坐不住",
+                        text: $currentConcern
+                    )
+
+                    // Q4: 最近的愉快互动
+                    observationQuestion(
+                        icon: "heart.circle.fill",
+                        iconColor: .pink,
+                        title: "愉快时刻",
+                        subtitle: "最近一次让您觉得特别开心的亲子时刻是？",
+                        placeholder: "例如：昨天一起画画，他第一次会画圆圈了",
+                        text: $bestMoment
+                    )
+                }
+                .padding(.horizontal, 24)
+
+                // 提示可跳过
+                Text("💡 越详细越好，也可以跳过任意问题")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.bottom, 20)
+            }
+        }
+    }
+
+    /// 单个观察问题卡片
+    private func observationQuestion(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        subtitle: String,
+        placeholder: String,
+        text: Binding<String>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(iconColor)
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+            }
+
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            TextField(placeholder, text: text, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
+                .font(.body)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.appSurface)
+        )
+    }
+
+    // MARK: - Step 5: Confirm
 
     private var confirmStep: some View {
         VStack(spacing: 24) {
@@ -311,6 +451,11 @@ public struct OnboardingView: View {
                 confirmRow(label: "关注方向", value: selectedThemes.isEmpty ? "未选择" : selectedThemes.map(\.displayName).joined(separator: "、"))
                 if !recentSituation.trimmingCharacters(in: .whitespaces).isEmpty {
                     confirmRow(label: "近况", value: recentSituation.trimmingCharacters(in: .whitespaces))
+                }
+                if hasInitialObservations {
+                    Divider()
+                    let obsCount = initialObservationFilledCount
+                    confirmRow(label: "初始观察", value: "已填写 \(obsCount) 项")
                 }
             }
             .padding()
@@ -359,7 +504,10 @@ public struct OnboardingView: View {
                         ProgressView()
                             .tint(.white)
                     } else {
-                        Text("进入首页")
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                            Text("生成我的计划")
+                        }
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -383,7 +531,8 @@ public struct OnboardingView: View {
             let ageMonths = computeAgeMonths()
             return ageMonths >= 18 && ageMonths <= 48
         case 2: return true // themes optional
-        case 3: return !childNickname.trimmingCharacters(in: .whitespaces).isEmpty
+        case 3: return true // initial observations optional
+        case 4: return !childNickname.trimmingCharacters(in: .whitespaces).isEmpty
         default: return true
         }
     }
@@ -440,13 +589,28 @@ public struct OnboardingView: View {
                 }
             }
 
-            // 4. 刷新 AppState
-            await appState.refreshChildren()
+            // 4. 保存 childId，切换到过渡页（计划生成中）
+            createdChildId = child.id
+            isSubmitting = false
 
-            // 5. 自动生成首份计划（静默失败，不阻塞引导完成）
+            // 5. 展示计划生成过渡页，并在后台异步生成计划
+            withAnimation {
+                showPlanGenerating = true
+            }
+
+            // 6. 同时触发 AppState 刷新（在后台）
+            Task {
+                await appState.refreshChildren()
+            }
+
+            // 7. 自动生成首份计划（传入 initial_context）
             Task {
                 do {
-                    let _: PlanResponse = try await apiClient.request(.createPlan(childId: child.id))
+                    let initialContext = buildInitialContext()
+                    let _: PlanResponse = try await apiClient.request(
+                        .createPlanWithContext(childId: child.id, initialContext: initialContext)
+                    )
+                    print("[Onboarding] First plan generated successfully")
                 } catch {
                     // 静默失败：首份计划生成失败不影响引导流程
                     // 用户后续可在首页手动触发
@@ -456,14 +620,38 @@ public struct OnboardingView: View {
 
         } catch let apiError as APIError {
             errorMessage = apiError.localizedDescription
+            isSubmitting = false
         } catch {
             errorMessage = error.localizedDescription
+            isSubmitting = false
         }
+    }
 
-        isSubmitting = false
+    /// 组装首次计划生成的 initial_context
+    private func buildInitialContext() -> PlanInitialContext {
+        PlanInitialContext(
+            caregiverRole: caregiverRole,
+            recentSituation: recentSituation.trimmingCharacters(in: .whitespaces),
+            dailyRoutineNote: dailyRoutineNote.trimmingCharacters(in: .whitespaces),
+            interactionStyle: interactionStyle.trimmingCharacters(in: .whitespaces),
+            currentConcern: currentConcern.trimmingCharacters(in: .whitespaces),
+            bestMoment: bestMoment.trimmingCharacters(in: .whitespaces)
+        )
     }
 
     // MARK: - Helpers
+
+    /// 是否填写了任何初始观察问题
+    private var hasInitialObservations: Bool {
+        initialObservationFilledCount > 0
+    }
+
+    /// 已填写的初始观察问题数
+    private var initialObservationFilledCount: Int {
+        [dailyRoutineNote, interactionStyle, currentConcern, bestMoment]
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .count
+    }
 
     private func computeAgeMonths() -> Int {
         let now = Date()
@@ -484,14 +672,7 @@ public struct OnboardingView: View {
     }
 
     private func themeIcon(_ theme: FocusTheme) -> String {
-        switch theme {
-        case .language: return "mouth.fill"
-        case .social: return "person.2.fill"
-        case .emotion: return "heart.fill"
-        case .motor: return "figure.run"
-        case .cognition: return "brain.head.profile"
-        case .selfCare: return "hands.sparkles.fill"
-        }
+        theme.iconName
     }
 
     private func confirmRow(label: String, value: String) -> some View {

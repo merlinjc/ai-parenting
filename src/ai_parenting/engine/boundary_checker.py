@@ -1,14 +1,15 @@
 """非诊断化边界检查器。
 
 实现硬规则层的边界检查，包含：
-1. 诊断标签黑名单
-2. 治疗承诺黑名单
+1. 诊断标签黑名单（V2.0 扩展：细分诊断 + 学科术语）
+2. 治疗承诺黑名单（V2.0 扩展：医疗化动词）
 3. 绝对判断黑名单
-4. 过度量化正则
-5. 责备家长表达黑名单
-6. 否定儿童表达黑名单
-7. 字段完整性检查
-8. 字符长度检查
+4. 过度量化正则（V2.0 扩展：更多变体匹配）
+5. 责备家长表达黑名单（V2.0 扩展：隐性责备）
+6. 否定儿童表达黑名单（V2.0 扩展：能力否定 + 性格标签）
+7. 比较性语言黑名单（V2.0 新增：横向比较 + 常模对标 + 排名暗示）
+8. 字段完整性检查
+9. 字符长度检查
 
 支持三种 Result 类型：
 - InstantHelpResult
@@ -18,6 +19,7 @@
 黑名单词库来源：
 - ai_parenting_ai_output_schema_v1.md 第 6.4 节硬规则表
 - ai_parenting_prompt_templates_v1.md 第四章禁用词列表
+- V2.0 内容专业化安全词库扩展（比较语言控制 + 诊断词库细化）
 """
 
 from __future__ import annotations
@@ -43,8 +45,9 @@ from ai_parenting.models.schemas import (
 # 黑名单定义（预编译正则）
 # ---------------------------------------------------------------------------
 
-# 1. 诊断标签黑名单
+# 1. 诊断标签黑名单（V2.0 扩展：细分诊断 + 学科术语 + 英文缩写）
 _DIAGNOSIS_LABELS: list[str] = [
+    # --- V1 原有 ---
     "自闭",
     "自闭症",
     "多动",
@@ -55,31 +58,88 @@ _DIAGNOSIS_LABELS: list[str] = [
     "注意力缺陷",
     "孤独症谱系",
     "智力障碍",
+    # --- V2.0 新增：细分诊断名称 ---
+    "阿斯伯格",
+    "亚斯伯格",
+    "唐氏综合征",
+    "脑瘫",
+    "癫痫",
+    "抽动症",
+    "对立违抗",
+    "品行障碍",
+    "分离焦虑障碍",
+    "选择性缄默",
+    "反应性依恋障碍",
+    "言语失用",
+    "构音障碍",
+    "口吃",
+    # --- V2.0 新增：学科术语（家长不应在日常指导中看到） ---
+    "感觉统合失调",
+    "感觉寻求",
+    "感觉回避",
+    "前庭觉",
+    "本体觉",
+    "触觉防御",
+    "ASD",
+    "ADHD",
+    "SPD",
+    "ODD",
 ]
 _DIAGNOSIS_PATTERN: re.Pattern[str] = re.compile(
     "|".join(re.escape(w) for w in _DIAGNOSIS_LABELS)
 )
 _DIAGNOSIS_REPLACEMENT: str = "如果持续担心，建议咨询专业人士"
 
-# 2. 治疗承诺黑名单
+# 2. 治疗承诺黑名单（V2.0 扩展：医疗化动词 + 干预术语）
 _TREATMENT_PROMISES: list[str] = [
+    # --- V1 原有 ---
     "治愈",
     "矫正",
     "根治",
     "训练好",
     "康复",
     "纠正",
+    # --- V2.0 新增：医疗化动词 ---
+    "治疗",
+    "干预",
+    "矫治",
+    "修复",
+    "恢复正常",
+    "变正常",
+    "回到正轨",
+    # --- V2.0 新增：训练导向表达 ---
+    "强化训练",
+    "密集训练",
+    "系统训练",
+    "脱敏训练",
+    "行为矫正",
+    "早期干预",
 ]
 _TREATMENT_PATTERN: re.Pattern[str] = re.compile(
     "|".join(re.escape(w) for w in _TREATMENT_PROMISES)
 )
 _TREATMENT_REPLACEMENTS: dict[str, str] = {
+    # --- V1 原有 ---
     "治愈": "帮助",
     "矫正": "支持",
     "根治": "帮助",
     "训练好": "给更多机会",
     "康复": "支持",
     "纠正": "帮助",
+    # --- V2.0 新增 ---
+    "治疗": "支持",
+    "干预": "帮助",
+    "矫治": "支持",
+    "修复": "帮助",
+    "恢复正常": "继续在日常中给机会",
+    "变正常": "继续自然发展",
+    "回到正轨": "按自己的节奏成长",
+    "强化训练": "多一些自然练习机会",
+    "密集训练": "在日常生活中多给机会",
+    "系统训练": "在自然场景中持续支持",
+    "脱敏训练": "逐步熟悉新体验",
+    "行为矫正": "帮助建立新习惯",
+    "早期干预": "早期支持",
 }
 
 # 3. 绝对判断黑名单
@@ -103,38 +163,171 @@ _ABSOLUTE_REPLACEMENTS: dict[str, str] = {
     "百分之百": "很多家庭发现",
 }
 
-# 4. 过度量化正则
+# 4. 过度量化正则（V2.0 扩展：更多变体模式）
 _OVERQUANTIFY_PATTERN: re.Pattern[str] = re.compile(
     r"每天必须\s*\d+\s*次"
     r"|必须坚持\s*\d+\s*天"
     r"|达到\s*\d+\s*分钟"
+    r"|每天至少\s*\d+\s*次"
+    r"|一天\s*\d+\s*次以上"
+    r"|不少于\s*\d+\s*(?:次|分钟|小时)"
+    r"|保证每天\s*\d+\s*(?:次|分钟)"
+    r"|必须完成\s*\d+\s*(?:次|个|组)"
+    r"|每日\s*\d+\s*次训练"
 )
 _OVERQUANTIFY_REPLACEMENT: str = "尝试在自然时机中融入"
 
-# 5. 责备家长表达
+# 5. 责备家长表达（V2.0 扩展：隐性责备 + 内疚归因）
 _BLAME_PARENT_PATTERNS: list[str] = [
+    # --- V1 原有 ---
     "你应该早点注意到",
     "如果你之前就",
     "你做错了",
     "你没有",
+    # --- V2.0 新增：隐性责备 ---
+    "你怎么到现在才",
+    "你为什么不早点",
+    "都怪你",
+    "都是因为你",
+    "你耽误了",
+    "错过了最佳",
+    "错过了关键期",
+    "你忽视了",
+    "你忽略了",
+    # --- V2.0 新增：内疚归因 ---
+    "如果你当时",
+    "早知道你",
+    "你要是能",
+    "本来可以避免",
+    "你造成了",
+    "你导致了",
 ]
 _BLAME_PARENT_PATTERN: re.Pattern[str] = re.compile(
     "|".join(re.escape(w) for w in _BLAME_PARENT_PATTERNS)
 )
 _BLAME_PARENT_REPLACEMENT: str = "你的关注本身就是支持"
 
-# 6. 否定儿童表达
+# 6. 否定儿童表达（V2.0 扩展：能力否定 + 性格标签 + 消极预期）
 _NEGATE_CHILD_PATTERNS: list[str] = [
+    # --- V1 原有 ---
     "做不到",
     "学不会",
     "不正常",
     "有问题",
     "落后",
+    # --- V2.0 新增：能力否定 ---
+    "不行",
+    "不会",
+    "不能",
+    "缺乏能力",
+    "能力不足",
+    "水平低",
+    "太差",
+    "太慢",
+    # --- V2.0 新增：性格/特质标签 ---
+    "太内向",
+    "太胆小",
+    "太黏人",
+    "太倔",
+    "太固执",
+    "不听话",
+    "不乖",
+    "不懂事",
+    "笨",
+    "傻",
+    "懒",
+    # --- V2.0 新增：消极预期 ---
+    "以后会有问题",
+    "将来会",
+    "长大了也",
+    "一辈子",
 ]
 _NEGATE_CHILD_PATTERN: re.Pattern[str] = re.compile(
     "|".join(re.escape(w) for w in _NEGATE_CHILD_PATTERNS)
 )
 _NEGATE_CHILD_REPLACEMENT: str = "还在发展中"
+
+# 7. 比较性语言黑名单（V2.0 新增：横向比较 + 常模对标 + 排名暗示）
+_COMPARE_CHILD_PHRASES: list[str] = [
+    # --- 横向比较：与其他孩子直接对比 ---
+    "别人家的孩子",
+    "别的孩子",
+    "其他孩子都",
+    "同龄孩子都",
+    "同龄的孩子已经",
+    "人家孩子",
+    "正常孩子",
+    "正常的孩子",
+    "一般孩子",
+    "大部分孩子都能",
+    "大多数孩子已经",
+    "你看别人",
+    "你看人家",
+    "隔壁家",
+    "邻居家的",
+    # --- 常模对标：用统计标准衡量个体 ---
+    "达标",
+    "未达标",
+    "不达标",
+    "低于平均",
+    "低于标准",
+    "高于平均",
+    "评分",
+    "打分",
+    "得分",
+    "百分位",
+    "百分等级",
+    "标准分",
+    # --- 排名暗示：隐含竞争和排序 ---
+    "排名",
+    "第几名",
+    "倒数",
+    "垫底",
+    "领先",
+    "超过",
+    "落后于",
+    "赶不上",
+    "追不上",
+    "跟不上",
+    "比不上",
+    "不如",
+]
+_COMPARE_CHILD_PATTERN: re.Pattern[str] = re.compile(
+    "|".join(re.escape(w) for w in _COMPARE_CHILD_PHRASES)
+)
+_COMPARE_CHILD_REPLACEMENTS: dict[str, str] = {
+    # 横向比较替换
+    "别人家的孩子": "每个孩子",
+    "别的孩子": "每个孩子",
+    "其他孩子都": "很多家庭发现",
+    "同龄孩子都": "这个年龄段的孩子各有自己的节奏",
+    "同龄的孩子已经": "有些孩子在这方面发展得早一些",
+    "人家孩子": "每个孩子",
+    "正常孩子": "多数孩子",
+    "正常的孩子": "多数孩子",
+    "一般孩子": "很多孩子",
+    "大部分孩子都能": "不少孩子在这个阶段开始",
+    "大多数孩子已经": "有些孩子已经在尝试",
+    "你看别人": "咱们来看看孩子自己的变化",
+    "你看人家": "咱们来看看孩子自己的变化",
+    "隔壁家": "咱们家孩子",
+    "邻居家的": "咱们家孩子",
+    # 常模对标替换
+    "达标": "在发展中",
+    "未达标": "还在发展中",
+    "不达标": "还在发展中",
+    "低于平均": "正在按自己的节奏发展",
+    "低于标准": "正在按自己的节奏发展",
+    "高于平均": "在这方面发展得不错",
+    # 排名暗示替换
+    "落后于": "和之前相比",
+    "赶不上": "按自己的节奏在成长",
+    "追不上": "按自己的节奏在成长",
+    "跟不上": "按自己的节奏在成长",
+    "比不上": "和之前的自己比",
+    "不如": "和之前的自己比",
+}
+_COMPARE_CHILD_DEFAULT_REPLACEMENT: str = "跟自己的上周比"
 
 # ---------------------------------------------------------------------------
 # 字段长度约束（按 Result 类型分类）
@@ -230,12 +423,13 @@ class BoundaryChecker:
 
     对 InstantHelpResult / PlanGenerationResult / WeeklyFeedbackResult
     的所有文本字段执行硬规则检查：
-    - 诊断标签黑名单
-    - 治疗承诺黑名单
+    - 诊断标签黑名单（V2.0 扩展）
+    - 治疗承诺黑名单（V2.0 扩展）
     - 绝对判断黑名单
-    - 过度量化正则
-    - 责备家长表达
-    - 否定儿童表达
+    - 过度量化正则（V2.0 扩展）
+    - 责备家长表达（V2.0 扩展）
+    - 否定儿童表达（V2.0 扩展）
+    - 比较性语言（V2.0 新增）
     - 字段完整性
     - 字符长度
 
@@ -264,7 +458,7 @@ class BoundaryChecker:
         # 收集所有需要检查的文本字段
         text_fields = self._extract_text_fields(result)
 
-        # 执行六类黑名单检查
+        # 执行七类黑名单检查
         for field_path, text in text_fields.items():
             if text is None:
                 continue
@@ -274,6 +468,7 @@ class BoundaryChecker:
             flags.extend(self._check_overquantify(field_path, text))
             flags.extend(self._check_blame_parent(field_path, text))
             flags.extend(self._check_negate_child(field_path, text))
+            flags.extend(self._check_compare_child(field_path, text))
 
         # 字段完整性检查
         flags.extend(self._check_field_completeness(result))
@@ -487,6 +682,26 @@ class BoundaryChecker:
                     field_path=field_path,
                     original_text=match.group(),
                     replacement=_NEGATE_CHILD_REPLACEMENT,
+                )
+            )
+        return flags
+
+    @staticmethod
+    def _check_compare_child(
+        field_path: str, text: str
+    ) -> list[BoundaryFlag]:
+        """V2.0 新增：检查比较性语言（横向比较、常模对标、排名暗示）。"""
+        flags: list[BoundaryFlag] = []
+        for match in _COMPARE_CHILD_PATTERN.finditer(text):
+            word = match.group()
+            flags.append(
+                BoundaryFlag(
+                    category="compare_child",
+                    field_path=field_path,
+                    original_text=word,
+                    replacement=_COMPARE_CHILD_REPLACEMENTS.get(
+                        word, _COMPARE_CHILD_DEFAULT_REPLACEMENT
+                    ),
                 )
             )
         return flags

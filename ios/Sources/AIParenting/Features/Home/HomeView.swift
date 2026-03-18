@@ -141,6 +141,8 @@ public struct HomeView: View {
                     if let child = vm.child {
                         if vm.activePlan != nil {
                             weekFocusCard(child: child, plan: vm.activePlan, vm: vm)
+                        } else if vm.planGenerating {
+                            planGeneratingCard(child: child)
                         } else {
                             emptyPlanGuideCard(child: child)
                         }
@@ -384,6 +386,86 @@ public struct HomeView: View {
         let labels = ["一", "二", "三", "四", "五", "六", "日"]
         let index = (dayNumber - 1) % 7
         return labels[index]
+    }
+
+    // MARK: - 5a. Plan Generating Card
+
+    private func planGeneratingCard(child: ChildResponse) -> some View {
+        VStack(spacing: 16) {
+            // 动画脉冲效果
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.1), .purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 72, height: 72)
+
+                Image(systemName: "sparkles")
+                    .font(.system(size: 32))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .symbolEffect(.pulse, options: .repeating)
+            }
+
+            VStack(spacing: 6) {
+                Text("正在为\(child.nickname)生成专属计划")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+
+                Text("AI 正在根据您的信息设计 7 天微计划，预计 30 秒内完成")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            ProgressView()
+                .tint(.blue)
+                .scaleEffect(1.2)
+                .padding(.vertical, 4)
+
+            Text("完成后将自动刷新")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [.blue.opacity(0.04), .purple.opacity(0.04)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.15), .purple.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+        )
+        .task {
+            // 自动轮询：每 5 秒刷新一次，直到计划出现
+            while viewModel?.activePlan == nil {
+                try? await Task.sleep(for: .seconds(5))
+                await viewModel?.refresh()
+            }
+        }
     }
 
     // MARK: - 5. Empty Plan Guide Card

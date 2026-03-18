@@ -66,10 +66,50 @@ services:
 
   # =========================================================================
   # OpenClaw Gateway — WhatsApp/Telegram 多渠道消息网关
+  # 默认使用 OpenClaw 原版仓库构建（openclaw/ submodule）
+  # 如需回退旧版，使用: docker compose --profile legacy up gateway-legacy
   # =========================================================================
   gateway:
-    image: node:20-alpine
+    build:
+      context: ./openclaw
+      dockerfile: Dockerfile
     container_name: aip-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_WS_PORT:-8765}:8765"
+      - "${GATEWAY_HTTP_PORT:-18789}:18789"
+    environment:
+      # OpenClaw 核心配置
+      - OPENCLAW_PORT=18789
+      - OPENCLAW_WS_PORT=8765
+      - OPENCLAW_API_KEY=${OPENCLAW_API_KEY:-}
+      # WhatsApp (Baileys)
+      - WHATSAPP_ENABLED=${WHATSAPP_ENABLED:-false}
+      - WHATSAPP_SESSION_DIR=/data/whatsapp-sessions
+      # Telegram (grammY)
+      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      # Webhook 回调
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://backend:8000/api/v1/webhooks/openclaw}
+      - WEBHOOK_SECRET=${OPENCLAW_API_KEY:-}
+    volumes:
+      - gateway-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:18789/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - aip-net
+
+  # =========================================================================
+  # Legacy Gateway — 旧版简化网关（保留用于回退）
+  # 启用方式: docker compose --profile legacy up gateway-legacy
+  # =========================================================================
+  gateway-legacy:
+    image: node:20-alpine
+    container_name: aip-gateway-legacy
     restart: unless-stopped
     working_dir: /app
     command: >
@@ -83,22 +123,17 @@ services:
       - "${GATEWAY_WS_PORT:-8765}:8765"
       - "${GATEWAY_HTTP_PORT:-18789}:18789"
     environment:
-      # OpenClaw 核心配置
       - OPENCLAW_PORT=18789
       - OPENCLAW_WS_PORT=8765
       - OPENCLAW_API_KEY=${OPENCLAW_API_KEY:-}
-      # WhatsApp (Baileys)
       - WHATSAPP_ENABLED=${WHATSAPP_ENABLED:-false}
-      - WHATSAPP_SESSION_DIR=/app/data/whatsapp-sessions
-      # Telegram (grammY)
       - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      # Webhook 回调
       - WEBHOOK_URL=${WEBHOOK_URL:-http://backend:8000/api/v1/webhooks/openclaw}
       - WEBHOOK_SECRET=${OPENCLAW_API_KEY:-}
     volumes:
       - gateway-data:/app/data
-      - ./gateway:/app
+      - ./gateway-legacy:/app
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:18789/health"]
       interval: 30s
@@ -107,6 +142,8 @@ services:
       start_period: 15s
     networks:
       - aip-net
+    profiles:
+      - legacy
 
   # =========================================================================
   # PostgreSQL（生产环境）

@@ -1,8 +1,14 @@
 """OpenClaw Gateway 渠道适配器。
 
-通过 WebSocket 长连接对接 OpenClaw 网关，
+通过 WebSocket 长连接对接 OpenClaw 网关（协议 v3），
 统一转发 WhatsApp/Telegram 等海外渠道消息。
 实现指数退避重连、Circuit Breaker 模式和本地消息缓冲队列。
+
+协议 v3 关键变更：
+- 帧格式统一为 req/res/event 三种类型
+- 连接需要完成 challenge → connect → hello-ok 握手流程
+- 健康检查端点为 /healthz
+
 未安装 websockets 库时自动降级为日志 Mock。
 """
 
@@ -195,17 +201,23 @@ class OpenClawAdapter(ChannelAdapter):
         return await self._send_real(message, start)
 
     async def _send_real(self, message: ChannelMessage, start: float) -> SendResult:
-        """通过真实 WebSocket 发送消息并等待确认。"""
+        """通过真实 WebSocket 发送消息（协议 v3 帧格式）。"""
         target_channel = "whatsapp"
         if message.data:
             target_channel = message.data.get("target_channel", "whatsapp")
 
+        # 协议 v3: 使用 req 帧格式
+        request_id = f"send-{uuid.uuid4().hex[:12]}"
         payload = {
-            "type": "send",
-            "channel": target_channel,
-            "recipient": message.recipient_id,
-            "content": {"title": message.title, "body": message.body},
-            "idempotency_key": message.idempotency_key,
+            "type": "req",
+            "id": request_id,
+            "method": "send",
+            "params": {
+                "channel": target_channel,
+                "recipient": message.recipient_id,
+                "content": {"title": message.title, "body": message.body},
+                "idempotency_key": message.idempotency_key,
+            },
         }
 
         try:
@@ -214,7 +226,7 @@ class OpenClawAdapter(ChannelAdapter):
                 timeout=WS_SEND_TIMEOUT,
             )
 
-            # 等待 Gateway 确认回复
+            # 等待 Gateway 确认回复（协议 v3: res 帧）
             raw_response = await asyncio.wait_for(
                 self._ws.recv(),
                 timeout=WS_RECV_TIMEOUT,
@@ -222,10 +234,12 @@ class OpenClawAdapter(ChannelAdapter):
             response = json.loads(raw_response)
             elapsed = int((time.monotonic() - start) * 1000)
 
-            if response.get("status") == "ok":
+            # 协议 v3: 响应帧通过 ok 字段判断成功
+            if response.get("type") == "res" and response.get("ok") is True:
                 self._circuit_breaker.record_success()
                 self._last_error = None
-                msg_id = response.get("message_id", f"oc-{uuid.uuid4().hex[:8]}")
+                resp_payload = response.get("payload", {})
+                msg_id = resp_payload.get("message_id", f"oc-{uuid.uuid4().hex[:8]}")
                 logger.debug(
                     "OpenClaw sent: recipient=%s, channel=%s, msgid=%s, latency=%dms",
                     message.recipient_id, target_channel, msg_id, elapsed,
@@ -237,7 +251,8 @@ class OpenClawAdapter(ChannelAdapter):
                     latency_ms=elapsed,
                 )
             else:
-                error = response.get("error", "Unknown Gateway error")
+                error_obj = response.get("error", {})
+                error = error_obj.get("message", "Unknown Gateway error") if isinstance(error_obj, dict) else str(error_obj)
                 self._circuit_breaker.record_failure()
                 self._last_error = error
                 logger.warning(
@@ -300,7 +315,19 @@ class OpenClawAdapter(ChannelAdapter):
     async def receive_message(self, raw_payload: dict[str, Any]) -> InboundMessage | None:
         """解析 OpenClaw Gateway 转发的入站消息。
 
-        raw_payload 格式:
+        支持两种格式：
+        1. 协议 v3 event 帧：
+        {
+            "type": "event",
+            "event": "chat.event",
+            "payload": {
+                "channel": "whatsapp" | "telegram",
+                "sender": "user_channel_id",
+                "content": {"text": "...", "type": "text"},
+                "timestamp": "2026-03-17T10:00:00Z"
+            }
+        }
+        2. Webhook 回调（向后兼容）：
         {
             "type": "inbound",
             "channel": "whatsapp" | "telegram",
@@ -310,6 +337,28 @@ class OpenClawAdapter(ChannelAdapter):
         }
         """
         msg_type = raw_payload.get("type")
+
+        # 协议 v3 event 帧
+        if msg_type == "event":
+            event_name = raw_payload.get("event", "")
+            if event_name != "chat.event":
+                return None
+            payload = raw_payload.get("payload", {})
+            channel = payload.get("channel", "unknown")
+            sender = payload.get("sender", "")
+            content_obj = payload.get("content", {})
+            text = content_obj.get("text", "")
+            if not sender:
+                return None
+            return InboundMessage(
+                channel_name=f"openclaw_{channel}",
+                sender_id=sender,
+                content=text,
+                message_type=MessageType.TEXT,
+                raw_payload=raw_payload,
+            )
+
+        # 向后兼容：Webhook 回调格式
         if msg_type != "inbound":
             return None
 
@@ -330,7 +379,11 @@ class OpenClawAdapter(ChannelAdapter):
         )
 
     async def health_check(self) -> ChannelHealth:
-        """OpenClaw 渠道健康检查。"""
+        """OpenClaw 渠道健康检查。
+
+        除了 WebSocket 连接和断路器状态检查外，
+        还尝试 HTTP 探活 OpenClaw Gateway 的 /healthz 端点。
+        """
         cb_state = self._circuit_breaker.state
 
         if cb_state == CircuitState.OPEN:
@@ -357,24 +410,56 @@ class OpenClawAdapter(ChannelAdapter):
                 },
             )
 
+        # HTTP 探活 /healthz（仅在非 Mock 模式下）
+        gateway_healthy = True
+        gateway_latency_ms = 0
+        if not self._mock_mode:
+            try:
+                import aiohttp
+
+                # 从 ws:// URL 推断 http:// 健康检查 URL
+                healthz_url = self._ws_url.replace("ws://", "http://").replace("wss://", "https://")
+                # 移除 WebSocket 路径，使用 /healthz
+                base_url = healthz_url.rsplit("/", 1)[0] if "/" in healthz_url.split("://", 1)[-1] else healthz_url
+                healthz_url = f"{base_url}/healthz"
+
+                probe_start = time.monotonic()
+                async with aiohttp.ClientSession() as http_session:
+                    async with http_session.get(healthz_url, timeout=aiohttp.ClientTimeout(total=3)) as resp:
+                        gateway_latency_ms = int((time.monotonic() - probe_start) * 1000)
+                        gateway_healthy = resp.status == 200
+            except ImportError:
+                # aiohttp 未安装，跳过 HTTP 探活
+                pass
+            except Exception:
+                gateway_healthy = False
+
         return ChannelHealth(
-            status=ChannelStatus.HEALTHY,
-            latency_ms=10,
+            status=ChannelStatus.HEALTHY if gateway_healthy else ChannelStatus.DEGRADED,
+            latency_ms=gateway_latency_ms or 10,
+            error=None if gateway_healthy else "Gateway /healthz probe failed",
             last_check_at=datetime.now(timezone.utc),
             metadata={
                 "circuit_state": cb_state.value,
                 "buffer_size": self._buffer.qsize(),
                 "target_channels": self._target_channels,
                 "mode": "mock" if self._mock_mode else "production",
+                "gateway_healthz": "ok" if gateway_healthy else "failed",
             },
         )
 
     async def connect(self) -> None:
-        """建立 WebSocket 连接。
+        """建立 WebSocket 连接并完成协议 v3 握手。
+
+        握手流程：
+        1. 建立 WebSocket 连接
+        2. 等待 connect.challenge 事件
+        3. 发送 connect 请求（含认证信息）
+        4. 等待 hello-ok 响应
 
         如果 websockets 库未安装，自动降级为 Mock 模式。
         """
-        logger.info("OpenClaw WebSocket connecting to %s", self._ws_url)
+        logger.info("OpenClaw WebSocket connecting to %s (protocol v3)", self._ws_url)
 
         try:
             import websockets
@@ -386,10 +471,63 @@ class OpenClawAdapter(ChannelAdapter):
                 ping_timeout=WS_HEARTBEAT_TIMEOUT,
                 close_timeout=10,
             )
+
+            # 协议 v3 握手：等待 connect.challenge
+            try:
+                raw_challenge = await asyncio.wait_for(
+                    self._ws.recv(), timeout=5.0,
+                )
+                challenge = json.loads(raw_challenge)
+                if challenge.get("type") == "event" and challenge.get("event") == "connect.challenge":
+                    logger.debug("Received connect.challenge, sending connect request")
+                else:
+                    logger.debug("No challenge received, proceeding with direct connect")
+            except asyncio.TimeoutError:
+                logger.debug("No challenge event received (legacy mode), proceeding")
+
+            # 发送 connect 请求
+            connect_req = {
+                "type": "req",
+                "id": f"connect-{uuid.uuid4().hex[:8]}",
+                "method": "connect",
+                "params": {
+                    "minProtocol": 3,
+                    "maxProtocol": 3,
+                    "client": {
+                        "id": "ai-parenting-backend",
+                        "version": "0.3.0",
+                        "platform": "linux",
+                        "mode": "operator",
+                        "displayName": "AI Parenting Backend",
+                    },
+                    "role": "operator",
+                    "scopes": ["operator.read", "operator.write"],
+                    "auth": {"token": self._api_key} if self._api_key else {},
+                },
+            }
+            await self._ws.send(json.dumps(connect_req))
+
+            # 等待 hello-ok 响应
+            try:
+                raw_hello = await asyncio.wait_for(
+                    self._ws.recv(), timeout=5.0,
+                )
+                hello = json.loads(raw_hello)
+                if hello.get("type") == "res" and hello.get("ok") is True:
+                    hello_payload = hello.get("payload", {})
+                    server_version = hello_payload.get("server", {}).get("version", "unknown")
+                    logger.info(
+                        "OpenClaw WebSocket connected (protocol v3, server=%s)",
+                        server_version,
+                    )
+                else:
+                    logger.warning("Unexpected hello response: %s", hello)
+            except asyncio.TimeoutError:
+                logger.warning("Hello-ok timeout, proceeding with connection")
+
             self._connected = True
             self._mock_mode = False
             self._last_pong_at = time.monotonic()
-            logger.info("OpenClaw WebSocket connected (production)")
 
             # 启动心跳监控任务
             self._start_heartbeat_task()

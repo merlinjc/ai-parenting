@@ -134,7 +134,7 @@ class TestStageRiskCombinations:
     _RISK_KEYWORDS = {
         RiskLevel.NORMAL: "正常波动：计划语气",
         RiskLevel.ATTENTION: "重点关注：计划可以更明确",
-        RiskLevel.CONSULT: "建议咨询：产品不再输出",
+        RiskLevel.CONSULT: "建议咨询——保守支持路径",
     }
 
     _STAGE_AGE_MAP = {
@@ -232,7 +232,7 @@ class TestParsePlanGenerationResult:
 class TestPlanTemplateVersion:
     def test_version_format(self):
         version = get_plan_template_version()
-        assert version == "tpl_plan_generation_v1/1.0.0"
+        assert version == "tpl_plan_generation_v1/2.1.0"
         assert version == TEMPLATE_FULL_VERSION
 
     def test_version_contains_template_id(self):
@@ -266,3 +266,73 @@ class TestPlanBoundaryCheck:
         output = check_plan_boundary(result)
         assert output.passed is False
         assert any(f.category == "treatment_promise" for f in output.flags)
+
+
+# ---------------------------------------------------------------------------
+# Feedback Context Injection Tests
+# ---------------------------------------------------------------------------
+
+
+class TestFeedbackContextInjection:
+    """验证反馈回注上下文段正确注入 Prompt。"""
+
+    def test_empty_feedback_context_no_placeholder(self):
+        """空反馈上下文时，占位符应被清除。"""
+        ctx = _make_context()
+        prompt = render_plan_generation_prompt(
+            context=ctx,
+            feedback_context_text="",
+        )
+        assert "{{反馈回注上下文段}}" not in prompt
+
+    def test_feedback_context_injected(self):
+        """有反馈上下文时，文本应出现在 Prompt 中。"""
+        ctx = _make_context()
+        feedback_text = "【上周计划执行反馈——请据此调整本周计划】\n上周计划「选择表达周计划」完成率 71%。"
+        prompt = render_plan_generation_prompt(
+            context=ctx,
+            feedback_context_text=feedback_text,
+        )
+        assert "上周计划执行反馈" in prompt
+        assert "选择表达周计划" in prompt
+        assert "71%" in prompt
+        assert "{{反馈回注上下文段}}" not in prompt
+
+    def test_feedback_context_position_between_risk_and_language(self):
+        """反馈段应位于风险适配和家长语言风格之间。"""
+        ctx = _make_context()
+        feedback_text = "【上周计划执行反馈——MARKER——】"
+        prompt = render_plan_generation_prompt(
+            context=ctx,
+            feedback_context_text=feedback_text,
+        )
+        risk_pos = prompt.find("正常波动：计划语气")
+        feedback_pos = prompt.find("MARKER")
+        language_pos = prompt.find("家长语言风格指令")
+        assert risk_pos < feedback_pos < language_pos
+
+    def test_feedback_context_does_not_break_boundary_directives(self):
+        """反馈段注入不影响非诊断化边界指令。"""
+        ctx = _make_context()
+        feedback_text = "上周完成率 50%，家长选择降低难度。"
+        prompt = render_plan_generation_prompt(
+            context=ctx,
+            feedback_context_text=feedback_text,
+        )
+        assert "非诊断化边界" in prompt
+        assert "绝对禁止使用的词汇" in prompt
+
+    def test_feedback_context_coexists_with_all_stages(self):
+        """反馈段注入应与所有年龄阶段兼容。"""
+        for stage, age in [
+            (ChildStage.M18_24, 20),
+            (ChildStage.M24_36, 30),
+            (ChildStage.M36_48, 40),
+        ]:
+            ctx = _make_context(stage=stage, age=age)
+            feedback_text = "上周完成率 80%。"
+            prompt = render_plan_generation_prompt(
+                context=ctx,
+                feedback_context_text=feedback_text,
+            )
+            assert "上周完成率 80%" in prompt

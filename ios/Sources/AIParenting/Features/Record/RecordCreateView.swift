@@ -28,7 +28,7 @@ public struct RecordCreateView: View {
     @State private var selectedCandidates: Set<String> = []
     @State private var showSaveSuccess = false
 
-    private let tagOptions = ["语言", "社交", "情绪", "运动", "认知", "自理", "进步", "困难"]
+    private let tagOptions = ["语言", "社交", "情绪", "运动", "认知", "自理", "感觉调节", "依恋安全", "进步", "困难"]
     private let sceneOptions = ["家中", "户外", "学校", "游乐场", "其他"]
     private let timeOptions = ["早晨", "上午", "中午", "下午", "傍晚", "晚上"]
 

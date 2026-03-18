@@ -97,9 +97,11 @@ async def create_plan(
     """创建微计划（触发 AI 生成）。
 
     流程：调用 AI 生成 → 创建 Plan + 7 DayTask → 返回。
+    如果 body 中包含 initial_context（首次引导），会传入 AI 生成以增强个性化。
     """
     session = await create_plan_generation_session(
-        db, orchestrator, body.child_id
+        db, orchestrator, body.child_id,
+        initial_context=body.initial_context,
     )
 
     if session.status in ("failed",):

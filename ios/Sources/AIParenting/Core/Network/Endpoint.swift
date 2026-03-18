@@ -32,6 +32,7 @@ public enum Endpoint: Sendable {
     case getActivePlan(childId: UUID)
     case getPlan(UUID)
     case createPlan(childId: UUID)
+    case createPlanWithContext(childId: UUID, initialContext: PlanInitialContext?)
     case listPlans(childId: UUID, limit: Int = 20, offset: Int = 0)
     case updateDayTaskCompletion(planId: UUID, dayNumber: Int, DayTaskCompletionUpdate)
 
@@ -108,7 +109,7 @@ public enum Endpoint: Sendable {
             return "PATCH"
         case .register, .login, .refreshToken,
              .createChild, .refreshStage, .completeOnboarding,
-             .createRecord, .createPlan, .updateDayTaskCompletion,
+             .createRecord, .createPlan, .createPlanWithContext, .updateDayTaskCompletion,
              .instantHelp, .createFeedback, .markFeedbackViewed,
              .submitDecision, .messageClicked, .messageDelivered,
              .registerDevice, .uploadFile,
@@ -163,6 +164,8 @@ public enum Endpoint: Sendable {
         case .getPlan(let id):
             return "/api/v1/plans/\(id.uuidString)"
         case .createPlan:
+            return "/api/v1/plans"
+        case .createPlanWithContext:
             return "/api/v1/plans"
         case .listPlans:
             return "/api/v1/plans"
@@ -315,6 +318,7 @@ public enum Endpoint: Sendable {
         case .updateChild(_, let data): return data
         case .createRecord(let data): return data
         case .createPlan(let childId): return PlanCreateRequest(childId: childId)
+        case .createPlanWithContext(let childId, let ctx): return PlanCreateWithContextRequest(childId: childId, initialContext: ctx)
         case .updateDayTaskCompletion(_, _, let data): return data
         case .instantHelp(let data): return data
         case .createFeedback(let planId): return WeeklyFeedbackCreateRequest(planId: planId)
@@ -345,7 +349,7 @@ public enum Endpoint: Sendable {
     /// 期望的成功状态码
     public var expectedStatusCode: Int {
         switch self {
-        case .register, .createChild, .createRecord, .createPlan, .instantHelp, .registerDevice, .uploadFile, .bindChannel, .initializeMemory:
+        case .register, .createChild, .createRecord, .createPlan, .createPlanWithContext, .instantHelp, .registerDevice, .uploadFile, .bindChannel, .initializeMemory:
             return 201
         case .createFeedback:
             return 202
